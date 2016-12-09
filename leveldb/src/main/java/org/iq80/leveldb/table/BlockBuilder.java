@@ -30,17 +30,17 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
 public class BlockBuilder
 {
-    private final int blockRestartInterval;
-    private final IntVector restartPositions;
-    private final Comparator<Slice> comparator;
+	protected final int blockRestartInterval;
+	protected final IntVector restartPositions;
+	protected final Comparator<Slice> comparator;
 
-    private int entryCount;
-    private int restartBlockEntryCount;
+	protected int entryCount;
+	protected int restartBlockEntryCount;
 
-    private boolean finished;
-    private final DynamicSliceOutput block;
-    private Slice lastKey;
-
+	protected boolean finished;
+	protected final DynamicSliceOutput block;
+	protected Slice lastKey;
+    
     public BlockBuilder(int estimatedSize, int blockRestartInterval, Comparator<Slice> comparator)
     {
         Preconditions.checkArgument(estimatedSize >= 0, "estimatedSize is negative");

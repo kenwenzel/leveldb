@@ -18,6 +18,8 @@
 package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
+
+import org.iq80.leveldb.Options;
 import org.iq80.leveldb.util.ByteBufferSupport;
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
@@ -41,10 +43,10 @@ public class MMapTable
 {
     private MappedByteBuffer data;
 
-    public MMapTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    public MMapTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
             throws IOException
     {
-        super(name, fileChannel, comparator, verifyChecksums);
+        super(name, fileChannel, comparator, options);
         Preconditions.checkArgument(fileChannel.size() <= Integer.MAX_VALUE, "File must be smaller than %s bytes", Integer.MAX_VALUE);
     }
 
@@ -88,7 +90,7 @@ public class MMapTable
 
     @SuppressWarnings({"NonPrivateFieldAccessedInSynchronizedContext", "AssignmentToStaticFieldFromInstanceMethod"})
     @Override
-    protected Block readBlock(BlockHandle blockHandle)
+    protected Block readBlock(BlockHandle blockHandle, boolean metaData)
             throws IOException
     {
         // read block trailer

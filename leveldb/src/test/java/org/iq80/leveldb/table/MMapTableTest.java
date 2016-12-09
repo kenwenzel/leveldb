@@ -17,19 +17,20 @@
  */
 package org.iq80.leveldb.table;
 
-import org.iq80.leveldb.util.Slice;
-
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
+
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.util.Slice;
 
 public class MMapTableTest
         extends TableTest
 {
     @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
             throws IOException
     {
-        return new MMapTable(name, fileChannel, comparator, verifyChecksums);
+        return new MMapTable(name, fileChannel, comparator, options);
     }
 }

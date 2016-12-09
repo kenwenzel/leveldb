@@ -17,24 +17,25 @@
  */
 package org.iq80.leveldb.table;
 
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.Snappy;
+import static org.iq80.leveldb.CompressionType.SNAPPY;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Comparator;
 
-import static org.iq80.leveldb.CompressionType.SNAPPY;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.Snappy;
 
 public class FileChannelTable
         extends Table
 {
-    public FileChannelTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    public FileChannelTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
             throws IOException
     {
-        super(name, fileChannel, comparator, verifyChecksums);
+        super(name, fileChannel, comparator, options);
     }
 
     @Override
@@ -48,7 +49,7 @@ public class FileChannelTable
 
     @SuppressWarnings({"AssignmentToStaticFieldFromInstanceMethod", "NonPrivateFieldAccessedInSynchronizedContext"})
     @Override
-    protected Block readBlock(BlockHandle blockHandle)
+    protected Block readBlock(BlockHandle blockHandle, boolean metaData)
             throws IOException
     {
         // read block trailer

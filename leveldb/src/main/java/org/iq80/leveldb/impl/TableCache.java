@@ -23,6 +23,8 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+
+import org.iq80.leveldb.Options;
 import org.iq80.leveldb.table.FileChannelTable;
 import org.iq80.leveldb.table.MMapTable;
 import org.iq80.leveldb.table.Table;
@@ -42,7 +44,7 @@ public class TableCache
     private final LoadingCache<Long, TableAndFile> cache;
     private final Finalizer<Table> finalizer = new Finalizer<>(1);
 
-    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final boolean verifyChecksums)
+    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final Options options)
     {
         Preconditions.checkNotNull(databaseDir, "databaseName is null");
 
@@ -63,7 +65,7 @@ public class TableCache
                     public TableAndFile load(Long fileNumber)
                             throws IOException
                     {
-                        return new TableAndFile(databaseDir, fileNumber, userComparator, verifyChecksums);
+                        return new TableAndFile(databaseDir, fileNumber, userComparator, options);
                     }
                 });
     }
@@ -114,7 +116,7 @@ public class TableCache
     {
         private final Table table;
 
-        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, boolean verifyChecksums)
+        private TableAndFile(File databaseDir, long fileNumber, UserComparator userComparator, Options options)
                 throws IOException
         {
             String tableFileName = Filename.tableFileName(fileNumber);
@@ -122,10 +124,10 @@ public class TableCache
             try (FileInputStream fis = new FileInputStream(tableFile);
                     FileChannel fileChannel = fis.getChannel()) {
                 if (Iq80DBFactory.USE_MMAP) {
-                    table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                    table = new MMapTable(tableFile.getAbsolutePath(), fileChannel, userComparator, options);
                 }
                 else {
-                    table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, verifyChecksums);
+                    table = new FileChannelTable(tableFile.getAbsolutePath(), fileChannel, userComparator, options);
                 }
             }
         }

@@ -15,22 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.util.fpc;
 
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.util.Slice;
+import java.nio.ByteBuffer;
 
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.Comparator;
+public class FpcTest {
+	public static void main(String... args) {
+		FpcCompressor comp = new FpcCompressor();
 
-public class FileChannelTableTest
-        extends TableTest
-{
-    @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
-            throws IOException
-    {
-        return new FileChannelTable(name, fileChannel, comparator, options);
-    }
+		double[] template = { 0.0, 0.0123, 0.0532324, 0.02, 0.03344 };
+		double[] values = new double[500];
+		for (int idx = 0; idx < values.length; idx++) {
+			values[idx] = template[idx % template.length];
+		}
+
+		ByteBuffer bb = ByteBuffer.allocate(values.length * 8);
+		comp.compress(bb, values);
+
+		System.out.println(bb.position() / (double) values.length);
+	}
 }

@@ -30,6 +30,7 @@ public class Options
     private CompressionType compressionType = CompressionType.SNAPPY;
     private boolean verifyChecksums = true;
     private boolean paranoidChecks;
+    private boolean timeSeriesMode = false;
     private DBComparator comparator;
     private Logger logger;
     private long cacheSize;
@@ -171,6 +172,17 @@ public class Options
     public Options paranoidChecks(boolean paranoidChecks)
     {
         this.paranoidChecks = paranoidChecks;
+        return this;
+    }
+
+    public boolean timeSeriesMode()
+    {
+        return timeSeriesMode;
+    }
+
+    public Options timeSeriesMode(boolean timeSeriesMode)
+    {
+        this.timeSeriesMode = timeSeriesMode;
         return this;
     }
 }

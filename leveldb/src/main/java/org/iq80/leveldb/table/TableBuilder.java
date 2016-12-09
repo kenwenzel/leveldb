@@ -88,7 +88,11 @@ public class TableBuilder
         blockSize = options.blockSize();
         compressionType = options.compressionType();
 
-        dataBlockBuilder = new BlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
+	if (options.timeSeriesMode()) {
+	    dataBlockBuilder = new BlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
+	} else {
+	    dataBlockBuilder = new BlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
+	}
 
         // with expected 50% compression
         int expectedNumberOfBlocks = 1024;

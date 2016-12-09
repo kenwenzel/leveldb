@@ -17,6 +17,7 @@
  */
 package org.iq80.leveldb.util;
 
+import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.table.Block;
 import org.iq80.leveldb.table.BlockIterator;
 import org.iq80.leveldb.table.Table;
@@ -27,10 +28,10 @@ public final class TableIterator
         extends AbstractSeekingIterator<Slice, Slice>
 {
     private final Table table;
-    private final BlockIterator blockIterator;
-    private BlockIterator current;
+    private final SeekingIterator<Slice, Slice> blockIterator;
+    private SeekingIterator<Slice, Slice> current;
 
-    public TableIterator(Table table, BlockIterator blockIterator)
+    public TableIterator(Table table, SeekingIterator<Slice, Slice> blockIterator)
     {
         this.table = table;
         this.blockIterator = blockIterator;
@@ -96,7 +97,7 @@ public final class TableIterator
         }
     }
 
-    private BlockIterator getNextBlock()
+    private SeekingIterator<Slice, Slice> getNextBlock()
     {
         Slice blockHandle = blockIterator.next().getValue();
         Block dataBlock = table.openBlock(blockHandle);

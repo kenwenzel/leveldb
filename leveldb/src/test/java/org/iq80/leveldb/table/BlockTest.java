@@ -17,6 +17,7 @@
  */
 package org.iq80.leveldb.table;
 
+import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 import org.testng.annotations.Test;
@@ -122,7 +123,7 @@ public class BlockTest
         Block block = new Block(blockSlice, new BytewiseComparator());
         assertEquals(block.size(), BlockHelper.estimateBlockSize(blockRestartInterval, entries));
 
-        BlockIterator blockIterator = block.iterator();
+        SeekingIterator<Slice, Slice> blockIterator = block.iterator();
         BlockHelper.assertSequence(blockIterator, entries);
 
         blockIterator.seekToFirst();

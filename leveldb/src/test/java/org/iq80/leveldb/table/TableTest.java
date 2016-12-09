@@ -44,14 +44,14 @@ public abstract class TableTest
     private RandomAccessFile randomAccessFile;
     private FileChannel fileChannel;
 
-    protected abstract Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    protected abstract Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
             throws IOException;
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testEmptyFile()
             throws Exception
     {
-        createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
+        createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), new Options().verifyChecksums(true));
     }
 
     @Test
@@ -123,7 +123,7 @@ public abstract class TableTest
         }
         builder.finish();
 
-        Table table = createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), true);
+        Table table = createTable(file.getAbsolutePath(), fileChannel, new BytewiseComparator(), new Options().verifyChecksums(true));
 
         SeekingIterator<Slice, Slice> seekingIterator = table.iterator();
         BlockHelper.assertSequence(seekingIterator, entries);

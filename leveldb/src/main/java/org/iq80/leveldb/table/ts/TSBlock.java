@@ -15,22 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.table.ts;
 
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.util.Slice;
-
-import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.Comparator;
 
-public class FileChannelTableTest
-        extends TableTest
-{
+import org.iq80.leveldb.impl.SeekingIterator;
+import org.iq80.leveldb.table.Block;
+import org.iq80.leveldb.util.Slice;
+
+public class TSBlock extends Block {
+    public TSBlock(Slice block, Comparator<Slice> comparator) {
+	super(block, comparator);
+    }
+
     @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
-            throws IOException
-    {
-        return new FileChannelTable(name, fileChannel, comparator, options);
+    public SeekingIterator<Slice, Slice> iterator() {
+	return new TSBlockIterator(data, restartPositions, comparator);
     }
 }

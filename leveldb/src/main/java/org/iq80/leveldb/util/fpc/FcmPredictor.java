@@ -15,22 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.iq80.leveldb.table;
+package org.iq80.leveldb.util.fpc;
 
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.util.Slice;
+public class FcmPredictor {
 
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.util.Comparator;
+	private long[] table;
+	private int fcm_hash;
 
-public class FileChannelTableTest
-        extends TableTest
-{
-    @Override
-    protected Table createTable(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
-            throws IOException
-    {
-        return new FileChannelTable(name, fileChannel, comparator, options);
-    }
+	public FcmPredictor(int logOfTableSize) {
+		table = new long[1 << logOfTableSize];
+	}
+
+	public long getPrediction() {
+		return table[fcm_hash];
+	}
+
+	public void update(long true_value) {
+		table[fcm_hash] = true_value;
+		fcm_hash = (int) (((fcm_hash << 6) ^ (true_value >> 48)) & (table.length - 1));
+	}
 }

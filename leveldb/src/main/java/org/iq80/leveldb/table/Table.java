@@ -19,7 +19,11 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+
+import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.SeekingIterable;
+import org.iq80.leveldb.impl.SeekingIterator;
+import org.iq80.leveldb.table.ts.TSBlock;
 import org.iq80.leveldb.util.Closeables;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.TableIterator;
@@ -41,8 +45,9 @@ public abstract class Table
     protected final boolean verifyChecksums;
     protected final Block indexBlock;
     protected final BlockHandle metaindexBlockHandle;
+    protected final boolean timeSeriesMode;
 
-    public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, boolean verifyChecksums)
+    public Table(String name, FileChannel fileChannel, Comparator<Slice> comparator, Options options)
             throws IOException
     {
         Preconditions.checkNotNull(name, "name is null");
@@ -53,11 +58,12 @@ public abstract class Table
 
         this.name = name;
         this.fileChannel = fileChannel;
-        this.verifyChecksums = verifyChecksums;
+        this.verifyChecksums = options.verifyChecksums();
         this.comparator = comparator;
+        this.timeSeriesMode = options.timeSeriesMode();
 
         Footer footer = init();
-        indexBlock = readBlock(footer.getIndexBlockHandle());
+        indexBlock = readBlock(footer.getIndexBlockHandle(), true);
         metaindexBlockHandle = footer.getMetaindexBlockHandle();
     }
 
@@ -75,17 +81,26 @@ public abstract class Table
         BlockHandle blockHandle = BlockHandle.readBlockHandle(blockEntry.input());
         Block dataBlock;
         try {
-            dataBlock = readBlock(blockHandle);
+            dataBlock = readBlock(blockHandle, false);
         }
         catch (IOException e) {
             throw Throwables.propagate(e);
         }
         return dataBlock;
     }
+    
+    protected Block createBlock(Slice block, Comparator<Slice> comparator)
+    {
+	if (timeSeriesMode) {
+	    return new TSBlock(block, comparator);
+	} else {
+	    return new Block(block, comparator);
+	}
+    }
 
     protected static ByteBuffer uncompressedScratch = ByteBuffer.allocateDirect(4 * 1024 * 1024);
 
-    protected abstract Block readBlock(BlockHandle blockHandle)
+    protected abstract Block readBlock(BlockHandle blockHandle, boolean metaData)
             throws IOException;
 
     protected int uncompressedLength(ByteBuffer data)
@@ -105,7 +120,7 @@ public abstract class Table
      */
     public long getApproximateOffsetOf(Slice key)
     {
-        BlockIterator iterator = indexBlock.iterator();
+	SeekingIterator<Slice, Slice> iterator = indexBlock.iterator();
         iterator.seek(key);
         if (iterator.hasNext()) {
             BlockHandle blockHandle = BlockHandle.readBlockHandle(iterator.next().getValue().input());

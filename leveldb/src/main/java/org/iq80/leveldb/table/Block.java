@@ -19,6 +19,7 @@ package org.iq80.leveldb.table;
 
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.impl.SeekingIterable;
+import org.iq80.leveldb.impl.SeekingIterator;
 import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.Slices;
 
@@ -63,11 +64,11 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 public class Block
         implements SeekingIterable<Slice, Slice>
 {
-    private final Slice block;
-    private final Comparator<Slice> comparator;
+    protected final Slice block;
+    protected final Comparator<Slice> comparator;
 
-    private final Slice data;
-    private final Slice restartPositions;
+    protected final Slice data;
+    protected final Slice restartPositions;
 
     public Block(Slice block, Comparator<Slice> comparator)
     {
@@ -107,7 +108,7 @@ public class Block
     }
 
     @Override
-    public BlockIterator iterator()
+    public SeekingIterator<Slice, Slice> iterator()
     {
         return new BlockIterator(data, restartPositions, comparator);
     }
