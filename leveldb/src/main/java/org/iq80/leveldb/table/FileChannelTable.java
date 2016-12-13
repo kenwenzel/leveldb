@@ -87,7 +87,7 @@ public class FileChannelTable
             uncompressedData = Slices.copiedBuffer(uncompressedBuffer);
         }
 
-        return new Block(uncompressedData, comparator);
+        return createBlock(uncompressedData, comparator, metaData);
     }
 
     private ByteBuffer read(long offset, int length)

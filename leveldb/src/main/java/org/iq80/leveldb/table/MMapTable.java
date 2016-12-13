@@ -128,7 +128,7 @@ public class MMapTable
             uncompressedData = Slices.copiedBuffer(uncompressedBuffer);
         }
 
-        return new Block(uncompressedData, comparator);
+        return createBlock(uncompressedData, comparator, metaData);
     }
 
     public static ByteBuffer read(MappedByteBuffer data, int offset, int length)

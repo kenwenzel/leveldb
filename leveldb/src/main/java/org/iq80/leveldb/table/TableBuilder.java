@@ -17,20 +17,22 @@
  */
 package org.iq80.leveldb.table;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import org.iq80.leveldb.CompressionType;
-import org.iq80.leveldb.Options;
-import org.iq80.leveldb.util.PureJavaCrc32C;
-import org.iq80.leveldb.util.Slice;
-import org.iq80.leveldb.util.Slices;
-import org.iq80.leveldb.util.Snappy;
+import static org.iq80.leveldb.impl.VersionSet.TARGET_FILE_SIZE;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
-import static org.iq80.leveldb.impl.VersionSet.TARGET_FILE_SIZE;
+import org.iq80.leveldb.CompressionType;
+import org.iq80.leveldb.Options;
+import org.iq80.leveldb.table.ts.TSBlockBuilder;
+import org.iq80.leveldb.util.PureJavaCrc32C;
+import org.iq80.leveldb.util.Slice;
+import org.iq80.leveldb.util.Slices;
+import org.iq80.leveldb.util.Snappy;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 
 public class TableBuilder
 {
@@ -89,7 +91,7 @@ public class TableBuilder
         compressionType = options.compressionType();
 
 	if (options.timeSeriesMode()) {
-	    dataBlockBuilder = new BlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
+	    dataBlockBuilder = new TSBlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
 	} else {
 	    dataBlockBuilder = new BlockBuilder((int) Math.min(blockSize * 1.1, TARGET_FILE_SIZE), blockRestartInterval, userComparator);
 	}

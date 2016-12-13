@@ -24,7 +24,7 @@ public class FpcTest {
 		FpcCompressor comp = new FpcCompressor();
 
 		double[] template = { 0.0, 0.0123, 0.0532324, 0.02, 0.03344 };
-		double[] values = new double[500];
+		double[] values = new double[31];
 		for (int idx = 0; idx < values.length; idx++) {
 			values[idx] = template[idx % template.length];
 		}
@@ -33,5 +33,10 @@ public class FpcTest {
 		comp.compress(bb, values);
 
 		System.out.println(bb.position() / (double) values.length);
+		
+
+		bb.flip();
+		double[] values2 = new double[values.length];
+		comp.decompress(bb, values2);
 	}
 }

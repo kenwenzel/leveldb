@@ -19,6 +19,7 @@ package org.iq80.leveldb.table.ts;
 
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Comparator;
@@ -56,7 +57,7 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	Preconditions.checkNotNull(comparator, "comparator is null");
 
 	this.data = data.input();
-	this.bb = ByteBuffer.wrap(data.getRawArray());
+	this.bb = data.toByteBuffer();
 
 	this.restartPositions = restartPositions.slice();
 	restartCount = this.restartPositions.length() / SIZE_OF_INT;
@@ -67,11 +68,10 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
     }
 
     protected FpcCompressor getDoubleCompressor() {
-	FpcCompressor comp = doubleCompressor;
-	if (comp == null) {
-	    comp = doubleCompressor = new FpcCompressor();
+	if (doubleCompressor == null) {
+	    doubleCompressor = new FpcCompressor();
 	}
-	return comp;
+	return doubleCompressor;
     }
 
     @Override
@@ -111,7 +111,7 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
     }
 
     /**
-     * Repositions the iterator so the beginning of this block.
+     * Repositions the iterator to the beginning of this block.
      */
     @Override
     public void seekToFirst() {
@@ -177,7 +177,9 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	// clear the entries to assure key is not prefixed
 	nextEntry = null;
 	nextValue = null;
-	doubleCompressor = null;
+	if (doubleCompressor != null) {
+	    doubleCompressor.reset();
+	}
 
 	// read the entry
 	nextEntry = readEntry(data, null);
@@ -210,27 +212,40 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 
 	// read value
 	Slice value;
-	switch ((char) data.readByte()) {
+	int startPos = data.position();
+	byte header = data.readByte();
+	char valueType = (char) ((header & 0x3F) + 64);
+	switch (valueType) {
 	// use delta compression for double values
 	case 'D':
 	    if (nextValue != null) {
+		// TODO check why this is necessary
+		data.setPosition(startPos + valueLength);
 		value = nextValue;
 		nextValue = null;
 	    } else {
 		bb.position(data.position());
 		getDoubleCompressor().decode(bb, decodeBuffer, 0);
-		byte[] firstDouble = ByteBuffer.allocate(1 + Double.SIZE).order(ByteOrder.BIG_ENDIAN).put((byte) 'D')
+		byte[] firstDouble = ByteBuffer.allocate(1 + Double.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'D')
 			.putDouble(decodeBuffer[0]).array();
-		byte[] secondDouble = ByteBuffer.allocate(1 + Double.SIZE).order(ByteOrder.BIG_ENDIAN).put((byte) 'D')
-			.putDouble(decodeBuffer[1]).array();
 		value = new Slice(firstDouble);
-		nextValue = new Slice(secondDouble);
+		boolean isSingleValue = (header & (1 << 7)) != 0;
+		if (isSingleValue) {
+		    nextValue = null;
+		    doubleCompressor.reset();
+		} else {
+		    byte[] secondDouble = ByteBuffer.allocate(1 + Double.BYTES).order(ByteOrder.BIG_ENDIAN)
+			    .put((byte) 'D').putDouble(decodeBuffer[1]).array();
+		    nextValue = new Slice(secondDouble);
+		}
 		// update position of data stream
 		data.setPosition(bb.position());
 	    }
 	    break;
 	default:
+	    data.setPosition(startPos);
 	    value = data.readSlice(valueLength);
+	    value.setByte(0, (byte) valueType);
 	    break;
 	}
 

@@ -204,5 +204,9 @@ public class FpcCompressor {
 		}
 		return array;
 	}
-
+	
+	public void reset() {
+	    predictor1.reset();
+	    predictor2.reset();
+	}
 }

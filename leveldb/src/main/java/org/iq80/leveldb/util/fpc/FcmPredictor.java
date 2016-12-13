@@ -17,6 +17,8 @@
  */
 package org.iq80.leveldb.util.fpc;
 
+import java.util.Arrays;
+
 public class FcmPredictor {
 
 	private long[] table;
@@ -33,5 +35,10 @@ public class FcmPredictor {
 	public void update(long true_value) {
 		table[fcm_hash] = true_value;
 		fcm_hash = (int) (((fcm_hash << 6) ^ (true_value >> 48)) & (table.length - 1));
+	}
+	
+	public void reset() {
+	    fcm_hash = 0;
+	    Arrays.fill(table, 0);
 	}
 }

@@ -38,7 +38,11 @@ public class TSBlockBuilder extends BlockBuilder {
     // this key and the value cannot be written before the next value is known
     protected Slice holdKey, holdValue;
 
-    protected ByteBuffer encodingBuffer = ByteBuffer.allocate(64);
+    protected ByteBuffer encodingBuffer = ByteBuffer.allocate(Double.BYTES * 4);
+
+    // true, if the compression should be restarted with the next call of
+    // writeRaw
+    protected boolean restartCompression = false;
 
     public TSBlockBuilder(int estimatedSize, int blockRestartInterval, Comparator<Slice> comparator) {
 	super(estimatedSize, blockRestartInterval, comparator);
@@ -46,24 +50,33 @@ public class TSBlockBuilder extends BlockBuilder {
 
     public void reset() {
 	super.reset();
-	doubleCompressor = null;
+	if (doubleCompressor != null) {
+	    doubleCompressor.reset();
+	}
     }
 
     protected void writeRaw(Slice key, Slice value) {
 	Preconditions.checkState(!finished, "block is finished");
-	Preconditions.checkPositionIndex(restartBlockEntryCount, blockRestartInterval);
+	// Preconditions.checkPositionIndex(restartBlockEntryCount,
+	// blockRestartInterval);
 
 	Preconditions.checkArgument(lastKey == null || comparator.compare(key, lastKey) > 0,
 		"key must be greater than last key");
-	
+
 	int sharedKeyBytes = 0;
-	if (restartBlockEntryCount < blockRestartInterval) {
-	    sharedKeyBytes = calculateSharedBytes(key, lastKey);
-	} else {
+	if (restartCompression) {
+	    restartCompression = false;
+
 	    // restart prefix and value compression
+	    // this is done here to allow writeRaw to write two successive
+	    // values for double compression and others
 	    restartPositions.add(block.size());
 	    restartBlockEntryCount = 0;
-	    doubleCompressor = null;
+	    if (doubleCompressor != null) {
+		doubleCompressor.reset();
+	    }
+	} else {
+	    sharedKeyBytes = calculateSharedBytes(key, lastKey);
 	}
 
 	int nonSharedKeyBytes = key.length() - sharedKeyBytes;
@@ -89,8 +102,12 @@ public class TSBlockBuilder extends BlockBuilder {
 
     protected void writePrevValue() {
 	if (holdKey != null) {
-	    double prev = ByteBuffer.wrap(holdValue.getRawArray()).order(ByteOrder.BIG_ENDIAN).getDouble(1);
+	    ByteBuffer bb = holdValue.toByteBuffer().order(ByteOrder.BIG_ENDIAN);
+	    // skip marker
+	    bb.get();
+	    double prev = bb.getDouble();
 	    encodingBuffer.clear();
+	    encodingBuffer.put(encodeHeader('D', true));
 	    getDoubleCompressor().encodeAndPad(encodingBuffer, prev);
 	    Slice newValue = new Slice(encodingBuffer.array(), 0, encodingBuffer.position());
 	    writeRaw(holdKey, newValue);
@@ -100,11 +117,18 @@ public class TSBlockBuilder extends BlockBuilder {
     }
 
     protected FpcCompressor getDoubleCompressor() {
-	FpcCompressor comp = doubleCompressor;
-	if (comp == null) {
-	    comp = doubleCompressor = new FpcCompressor();
+	if (doubleCompressor == null) {
+	    doubleCompressor = new FpcCompressor();
 	}
-	return comp;
+	return doubleCompressor;
+    }
+
+    protected byte encodeHeader(char valueType, boolean isLast) {
+	byte header = (byte) (((byte) valueType - 64) & 0x3F);
+	if (isLast) {
+	    header |= 1 << 7;
+	}
+	return header;
     }
 
     public void add(Slice key, Slice value) {
@@ -112,24 +136,35 @@ public class TSBlockBuilder extends BlockBuilder {
 	Preconditions.checkNotNull(value, "value is null");
 
 	if (restartBlockEntryCount >= blockRestartInterval) {
-	    // this is a restart position
-	    // ensure that value compression starts again
+	    // ensure that last value is written
 	    writePrevValue();
+
+	    restartCompression = true;
 	}
-	
+
 	int valueLength = value.length();
 	if (valueLength > 0) {
-	    switch ((char) value.getByte(0)) {
-	    // use delta compression for double values
+	    char valueType = (char) value.getByte(0);
+	    switch (valueType) {
+	    // use optimized delta compression for double values
 	    case 'D':
 		if (holdKey != null) {
-		    double prev = ByteBuffer.wrap(holdValue.getRawArray()).order(ByteOrder.BIG_ENDIAN).getDouble(1);
-		    double next = ByteBuffer.wrap(value.getRawArray()).order(ByteOrder.BIG_ENDIAN).getDouble(1);
+		    ByteBuffer bb = holdValue.toByteBuffer().order(ByteOrder.BIG_ENDIAN);
+		    // skip marker
+		    bb.get();
+		    double prev = bb.getDouble();
+		    bb = value.toByteBuffer().order(ByteOrder.BIG_ENDIAN);
+		    // skip marker
+		    bb.get();
+		    double next = bb.getDouble();
 		    encodingBuffer.clear();
+		    encodingBuffer.put(encodeHeader('D', false));
 		    getDoubleCompressor().encode(encodingBuffer, prev, next);
+
 		    Slice newValue = new Slice(encodingBuffer.array(), 0, encodingBuffer.position());
 		    writeRaw(holdKey, newValue);
-		    writeRaw(key, new Slice(value.getRawArray(), 0, 1));
+		    // write only 'D' as indicator for a double value
+		    writeRaw(key, new Slice(new byte[] { encodeHeader('D', false) }));
 		    holdKey = null;
 		    holdValue = null;
 		} else {
@@ -139,7 +174,9 @@ public class TSBlockBuilder extends BlockBuilder {
 		break;
 	    default:
 		writePrevValue();
+		value.setByte(0, encodeHeader(valueType, false));
 		writeRaw(key, value);
+		break;
 	    }
 	} else {
 	    writeRaw(key, value);

@@ -89,9 +89,9 @@ public abstract class Table
         return dataBlock;
     }
     
-    protected Block createBlock(Slice block, Comparator<Slice> comparator)
+    protected Block createBlock(Slice block, Comparator<Slice> comparator, boolean metaData)
     {
-	if (timeSeriesMode) {
+	if (!metaData && timeSeriesMode) {
 	    return new TSBlock(block, comparator);
 	} else {
 	    return new Block(block, comparator);
