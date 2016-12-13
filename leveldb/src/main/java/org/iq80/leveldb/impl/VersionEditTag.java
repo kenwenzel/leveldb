@@ -139,7 +139,7 @@ public enum VersionEditTag
                     int level = VariableLengthQuantity.readVariableLengthInt(sliceInput);
 
                     // internal key
-                    InternalKey internalKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
+                    InternalKey internalKey = versionEdit.getInternalKeyFactory().createInternalKey(readLengthPrefixedBytes(sliceInput));
 
                     versionEdit.setCompactPointer(level, internalKey);
                 }
@@ -203,10 +203,10 @@ public enum VersionEditTag
                     long fileSize = VariableLengthQuantity.readVariableLengthLong(sliceInput);
 
                     // smallest key
-                    InternalKey smallestKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
+                    InternalKey smallestKey = versionEdit.getInternalKeyFactory().createInternalKey(readLengthPrefixedBytes(sliceInput));
 
                     // largest key
-                    InternalKey largestKey = new InternalKey(readLengthPrefixedBytes(sliceInput));
+                    InternalKey largestKey = versionEdit.getInternalKeyFactory().createInternalKey(readLengthPrefixedBytes(sliceInput));
 
                     versionEdit.addFile(level, fileNumber, fileSize, smallestKey, largestKey);
                 }

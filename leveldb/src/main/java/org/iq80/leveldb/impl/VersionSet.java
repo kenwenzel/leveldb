@@ -75,16 +75,19 @@ public class VersionSet
     private final Map<Version, Object> activeVersions = new MapMaker().weakKeys().makeMap();
     private final File databaseDir;
     private final TableCache tableCache;
+    
+    private final InternalKeyFactory internalKeyFactory;
     private final InternalKeyComparator internalKeyComparator;
-
+    
     private LogWriter descriptorLog;
     private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
 
-    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    public VersionSet(File databaseDir, TableCache tableCache, InternalKeyFactory internalKeyFactory, InternalKeyComparator internalKeyComparator)
             throws IOException
     {
         this.databaseDir = databaseDir;
         this.tableCache = tableCache;
+        this.internalKeyFactory = internalKeyFactory;
         this.internalKeyComparator = internalKeyComparator;
         appendVersion(new Version(this));
 
@@ -97,7 +100,7 @@ public class VersionSet
         File currentFile = new File(databaseDir, Filename.currentFileName());
 
         if (!currentFile.exists()) {
-            VersionEdit edit = new VersionEdit();
+            VersionEdit edit = new VersionEdit(internalKeyFactory);
             edit.setComparatorName(internalKeyComparator.name());
             edit.setLogNumber(prevLogNumber);
             edit.setNextFileNumber(nextFileNumber.get());
@@ -158,6 +161,11 @@ public class VersionSet
     public InternalKeyComparator getInternalKeyComparator()
     {
         return internalKeyComparator;
+    }
+
+    public InternalKeyFactory getInternalKeyFactory()
+    {
+        return internalKeyFactory;
     }
 
     public TableCache getTableCache()
@@ -315,7 +323,7 @@ public class VersionSet
             throws IOException
     {
         // Save metadata
-        VersionEdit edit = new VersionEdit();
+        VersionEdit edit = new VersionEdit(internalKeyFactory);
         edit.setComparatorName(internalKeyComparator.name());
 
         // Save compaction pointers
@@ -354,7 +362,7 @@ public class VersionSet
             LogReader reader = new LogReader(fileChannel, throwExceptionMonitor(), true, 0);
             for (Slice record = reader.readRecord(); record != null; record = reader.readRecord()) {
                 // read version edit
-                VersionEdit edit = new VersionEdit(record);
+                VersionEdit edit = new VersionEdit(record, internalKeyFactory);
 
                 // verify comparator
                 // todo implement user comparator
@@ -607,7 +615,7 @@ public class VersionSet
 //                    EscapeString(largest.Encode()).c_str());
 //        }
 
-        Compaction compaction = new Compaction(current, level, levelInputs, levelUpInputs, grandparents);
+        Compaction compaction = new Compaction(current, level, levelInputs, levelUpInputs, grandparents, internalKeyFactory);
 
         // Update the place where we will do the next compaction for this level.
         // We update this immediately instead of waiting for the VersionEdit

@@ -60,12 +60,12 @@ public class Version
         this.versionSet = versionSet;
         Preconditions.checkArgument(NUM_LEVELS > 1, "levels must be at least 2");
 
-        this.level0 = new Level0(Lists.<FileMetaData>newArrayList(), getTableCache(), getInternalKeyComparator());
+        this.level0 = new Level0(Lists.<FileMetaData>newArrayList(), getTableCache(), getInternalKeyFactory(), getInternalKeyComparator());
 
         Builder<Level> builder = ImmutableList.builder();
         for (int i = 1; i < NUM_LEVELS; i++) {
             List<FileMetaData> files = newArrayList();
-            builder.add(new Level(i, files, getTableCache(), getInternalKeyComparator()));
+            builder.add(new Level(i, files, getTableCache(), getInternalKeyFactory(), getInternalKeyComparator()));
         }
         this.levels = builder.build();
 
@@ -108,6 +108,11 @@ public class Version
     public final InternalKeyComparator getInternalKeyComparator()
     {
         return versionSet.getInternalKeyComparator();
+    }
+
+    public final InternalKeyFactory getInternalKeyFactory()
+    {
+        return versionSet.getInternalKeyFactory();
     }
 
     public synchronized int getCompactionLevel()
@@ -184,8 +189,8 @@ public class Version
         if (!overlapInLevel(0, smallestUserKey, largestUserKey)) {
             // Push to next level if there is no overlap in next level,
             // and the #bytes overlapping in the level after that are limited.
-            InternalKey start = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            InternalKey limit = new InternalKey(largestUserKey, 0, ValueType.VALUE);
+            InternalKey start = getInternalKeyFactory().createInternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
+            InternalKey limit = getInternalKeyFactory().createInternalKey(largestUserKey, 0, ValueType.VALUE);
             while (level < MAX_MEM_COMPACT_LEVEL) {
                 if (overlapInLevel(level + 1, smallestUserKey, largestUserKey)) {
                     break;

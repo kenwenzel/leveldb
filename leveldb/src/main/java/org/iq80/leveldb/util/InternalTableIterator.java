@@ -19,6 +19,7 @@ package org.iq80.leveldb.util;
 
 import com.google.common.collect.Maps;
 import org.iq80.leveldb.impl.InternalKey;
+import org.iq80.leveldb.impl.InternalKeyFactory;
 
 import java.util.Map.Entry;
 
@@ -27,10 +28,12 @@ public class InternalTableIterator
         implements InternalIterator
 {
     private final TableIterator tableIterator;
+    private final InternalKeyFactory internalKeyFactory;
 
-    public InternalTableIterator(TableIterator tableIterator)
+    public InternalTableIterator(TableIterator tableIterator, InternalKeyFactory internalKeyFactory)
     {
         this.tableIterator = tableIterator;
+        this.internalKeyFactory = internalKeyFactory;
     }
 
     @Override
@@ -50,7 +53,7 @@ public class InternalTableIterator
     {
         if (tableIterator.hasNext()) {
             Entry<Slice, Slice> next = tableIterator.next();
-            return Maps.immutableEntry(new InternalKey(next.getKey()), next.getValue());
+            return Maps.immutableEntry(internalKeyFactory.createInternalKey(next.getKey()), next.getValue());
         }
         return null;
     }

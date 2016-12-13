@@ -100,6 +100,7 @@ public class DbImpl
     private MemTable memTable;
     private MemTable immutableMemTable;
 
+    private final InternalKeyFactory internalKeyFactory;
     private final InternalKeyComparator internalKeyComparator;
 
     private volatile Throwable backgroundException;
@@ -131,8 +132,19 @@ public class DbImpl
         else {
             userComparator = new BytewiseComparator();
         }
+        internalKeyFactory = new InternalKeyFactory() {
+	    @Override
+	    public InternalKey createInternalKey(Slice data) {
+		return new InternalKey(data);
+	    }
+	    
+	    @Override
+	    public InternalKey createInternalKey(Slice userKey, long sequenceNumber, ValueType valueType) {
+		return new InternalKey(userKey, sequenceNumber, valueType);
+	    }
+	};
         internalKeyComparator = new InternalKeyComparator(userComparator);
-        memTable = new MemTable(internalKeyComparator);
+        memTable = new MemTable(internalKeyFactory, internalKeyComparator);
         immutableMemTable = null;
 
         ThreadFactory compactionThreadFactory = new ThreadFactoryBuilder()
@@ -152,7 +164,7 @@ public class DbImpl
 
         // Reserve ten files or so for other uses and give the rest to TableCache.
         int tableCacheSize = options.maxOpenFiles() - 10;
-        tableCache = new TableCache(databaseDir, tableCacheSize, new InternalUserComparator(internalKeyComparator), options);
+        tableCache = new TableCache(databaseDir, tableCacheSize, new InternalUserComparator(internalKeyFactory, internalKeyComparator), options, internalKeyFactory);
 
         // create the version set
 
@@ -175,7 +187,7 @@ public class DbImpl
                 Preconditions.checkArgument(!options.errorIfExists(), "Database '%s' exists and the error if exists option is enabled", databaseDir);
             }
 
-            versions = new VersionSet(databaseDir, tableCache, internalKeyComparator);
+            versions = new VersionSet(databaseDir, tableCache, internalKeyFactory, internalKeyComparator);
 
             // load  (and recover) current version
             versions.recover();
@@ -203,7 +215,7 @@ public class DbImpl
             }
 
             // Recover in the order in which the logs were generated
-            VersionEdit edit = new VersionEdit();
+            VersionEdit edit = new VersionEdit(internalKeyFactory);
             Collections.sort(logs);
             for (Long fileNumber : logs) {
                 long maxSequence = recoverLogFile(fileNumber, edit);
@@ -465,8 +477,8 @@ public class DbImpl
         Compaction compaction;
         if (manualCompaction != null) {
             compaction = versions.compactRange(manualCompaction.level,
-                    new InternalKey(manualCompaction.begin, MAX_SEQUENCE_NUMBER, VALUE),
-                    new InternalKey(manualCompaction.end, 0, DELETION));
+                    internalKeyFactory.createInternalKey(manualCompaction.begin, MAX_SEQUENCE_NUMBER, VALUE),
+                    internalKeyFactory.createInternalKey(manualCompaction.end, 0, DELETION));
         }
         else {
             compaction = versions.pickCompaction();
@@ -542,7 +554,7 @@ public class DbImpl
 
                 // apply entries to memTable
                 if (memTable == null) {
-                    memTable = new MemTable(internalKeyComparator);
+                    memTable = new MemTable(internalKeyFactory, internalKeyComparator);
                 }
                 writeBatch.forEach(new InsertIntoHandler(memTable, sequenceBegin));
 
@@ -584,7 +596,7 @@ public class DbImpl
         mutex.lock();
         try {
             SnapshotImpl snapshot = getSnapshot(options);
-            lookupKey = new LookupKey(Slices.wrappedBuffer(key), snapshot.getLastSequence());
+            lookupKey = new LookupKey(internalKeyFactory.createInternalKey(Slices.wrappedBuffer(key), snapshot.getLastSequence(), ValueType.VALUE));
 
             // First look in the memtable, then in the immutable memtable (if any).
             LookupResult lookupResult = memTable.get(lookupKey);
@@ -743,7 +755,7 @@ public class DbImpl
 
             // filter any entries not visible in our snapshot
             SnapshotImpl snapshot = getSnapshot(options);
-            SnapshotSeekingIterator snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator());
+            SnapshotSeekingIterator snapshotIterator = new SnapshotSeekingIterator(rawIterator, snapshot, internalKeyComparator.getUserComparator(), internalKeyFactory);
             return new SeekingIteratorAdapter(snapshotIterator);
         }
         finally {
@@ -879,7 +891,7 @@ public class DbImpl
 
                 // create a new mem table
                 immutableMemTable = memTable;
-                memTable = new MemTable(internalKeyComparator);
+                memTable = new MemTable(internalKeyFactory, internalKeyComparator);
 
                 // Do not force another compaction there is space available
                 force = false;
@@ -911,7 +923,7 @@ public class DbImpl
 
         try {
             // Save the contents of the memtable as a new Table
-            VersionEdit edit = new VersionEdit();
+            VersionEdit edit = new VersionEdit(internalKeyFactory);
             Version base = versions.getCurrent();
             writeLevel0Table(immutableMemTable, edit, base);
 
@@ -978,7 +990,7 @@ public class DbImpl
             InternalKey largest = null;
             FileChannel channel = new FileOutputStream(file).getChannel();
             try {
-                TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyComparator));
+                TableBuilder tableBuilder = new TableBuilder(options, channel, new InternalUserComparator(internalKeyFactory, internalKeyComparator));
 
                 for (Entry<InternalKey, Slice> entry : data) {
                     // update keys
@@ -1146,7 +1158,7 @@ public class DbImpl
 
             File file = new File(databaseDir, Filename.tableFileName(fileNumber));
             compactionState.outfile = new FileOutputStream(file).getChannel();
-            compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyComparator));
+            compactionState.builder = new TableBuilder(options, compactionState.outfile, new InternalUserComparator(internalKeyFactory, internalKeyComparator));
         }
         finally {
             mutex.unlock();
@@ -1238,8 +1250,8 @@ public class DbImpl
     {
         Version v = versions.getCurrent();
 
-        InternalKey startKey = new InternalKey(Slices.wrappedBuffer(range.start()), MAX_SEQUENCE_NUMBER, VALUE);
-        InternalKey limitKey = new InternalKey(Slices.wrappedBuffer(range.limit()), MAX_SEQUENCE_NUMBER, VALUE);
+        InternalKey startKey = internalKeyFactory.createInternalKey(Slices.wrappedBuffer(range.start()), MAX_SEQUENCE_NUMBER, VALUE);
+        InternalKey limitKey = internalKeyFactory.createInternalKey(Slices.wrappedBuffer(range.limit()), MAX_SEQUENCE_NUMBER, VALUE);
         long startOffset = v.getApproximateOffsetOf(startKey);
         long limitOffset = v.getApproximateOffsetOf(limitKey);
 

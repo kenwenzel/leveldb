@@ -43,11 +43,13 @@ public class TableCache
 {
     private final LoadingCache<Long, TableAndFile> cache;
     private final Finalizer<Table> finalizer = new Finalizer<>(1);
+    
+    private final InternalKeyFactory internalKeyFactory;
 
-    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final Options options)
+    public TableCache(final File databaseDir, int tableCacheSize, final UserComparator userComparator, final Options options, final InternalKeyFactory internalKeyFactory)
     {
         Preconditions.checkNotNull(databaseDir, "databaseName is null");
-
+        this.internalKeyFactory = internalKeyFactory;
         cache = CacheBuilder.newBuilder()
                 .maximumSize(tableCacheSize)
                 .removalListener(new RemovalListener<Long, TableAndFile>()
@@ -77,7 +79,7 @@ public class TableCache
 
     public InternalTableIterator newIterator(long number)
     {
-        return new InternalTableIterator(getTable(number).iterator());
+        return new InternalTableIterator(getTable(number).iterator(), internalKeyFactory);
     }
 
     public long getApproximateOffsetOf(FileMetaData file, Slice key)

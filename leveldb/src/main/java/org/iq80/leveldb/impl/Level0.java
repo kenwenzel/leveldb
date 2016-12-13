@@ -39,6 +39,7 @@ public class Level0
         implements SeekingIterable<InternalKey, Slice>
 {
     private final TableCache tableCache;
+    private final InternalKeyFactory internalKeyFactory;
     private final InternalKeyComparator internalKeyComparator;
     private final List<FileMetaData> files;
 
@@ -51,7 +52,7 @@ public class Level0
         }
     };
 
-    public Level0(List<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    public Level0(List<FileMetaData> files, TableCache tableCache, InternalKeyFactory internalKeyFactory, InternalKeyComparator internalKeyComparator)
     {
         Preconditions.checkNotNull(files, "files is null");
         Preconditions.checkNotNull(tableCache, "tableCache is null");
@@ -59,6 +60,7 @@ public class Level0
 
         this.files = newArrayList(files);
         this.tableCache = tableCache;
+        this.internalKeyFactory = internalKeyFactory;
         this.internalKeyComparator = internalKeyComparator;
     }
 
@@ -131,7 +133,7 @@ public class Level0
 
     public boolean someFileOverlapsRange(Slice smallestUserKey, Slice largestUserKey)
     {
-        InternalKey smallestInternalKey = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
+        InternalKey smallestInternalKey = internalKeyFactory.createInternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
         int index = findFile(smallestInternalKey);
 
         UserComparator userComparator = internalKeyComparator.getUserComparator();

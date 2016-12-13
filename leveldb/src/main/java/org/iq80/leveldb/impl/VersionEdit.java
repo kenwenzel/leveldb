@@ -39,19 +39,28 @@ public class VersionEdit
     private final Map<Integer, InternalKey> compactPointers = Maps.newTreeMap();
     private final Multimap<Integer, FileMetaData> newFiles = ArrayListMultimap.create();
     private final Multimap<Integer, Long> deletedFiles = ArrayListMultimap.create();
+    
+    private final InternalKeyFactory internalKeyFactory;
 
-    public VersionEdit()
+    public VersionEdit(InternalKeyFactory internalKeyFactory)
     {
+	this.internalKeyFactory = internalKeyFactory;
     }
 
-    public VersionEdit(Slice slice)
+    public VersionEdit(Slice slice, InternalKeyFactory internalKeyFactory)
     {
+	this.internalKeyFactory = internalKeyFactory;
         SliceInput sliceInput = slice.input();
         while (sliceInput.isReadable()) {
             int i = VariableLengthQuantity.readVariableLengthInt(sliceInput);
             VersionEditTag tag = VersionEditTag.getValueTypeByPersistentId(i);
             tag.readValue(sliceInput, this);
         }
+    }
+    
+    public InternalKeyFactory getInternalKeyFactory()
+    {
+        return internalKeyFactory;
     }
 
     public String getComparatorName()

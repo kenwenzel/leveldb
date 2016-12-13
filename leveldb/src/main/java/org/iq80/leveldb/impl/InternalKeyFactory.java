@@ -19,28 +19,8 @@ package org.iq80.leveldb.impl;
 
 import org.iq80.leveldb.util.Slice;
 
-public class LookupKey
-{
-    private final InternalKey key;
+public interface InternalKeyFactory {
+    InternalKey createInternalKey(Slice userKey, long sequenceNumber, ValueType valueType);
 
-    public LookupKey(InternalKey key)
-    {
-        this.key = key;
-    }
-
-    public InternalKey getInternalKey()
-    {
-        return key;
-    }
-
-    public Slice getUserKey()
-    {
-        return key.getUserKey();
-    }
-
-    @Override
-    public String toString()
-    {
-        return key.toString();
-    }
+    InternalKey createInternalKey(Slice data);
 }

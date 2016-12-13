@@ -31,12 +31,14 @@ public final class SnapshotSeekingIterator
     private final DbIterator iterator;
     private final SnapshotImpl snapshot;
     private final Comparator<Slice> userComparator;
+    private final InternalKeyFactory internalKeyFactory;
 
-    public SnapshotSeekingIterator(DbIterator iterator, SnapshotImpl snapshot, Comparator<Slice> userComparator)
+    public SnapshotSeekingIterator(DbIterator iterator, SnapshotImpl snapshot, Comparator<Slice> userComparator, InternalKeyFactory internalKeyFactory)
     {
         this.iterator = iterator;
         this.snapshot = snapshot;
         this.userComparator = userComparator;
+        this.internalKeyFactory = internalKeyFactory;
         this.snapshot.getVersion().retain();
     }
 
@@ -55,7 +57,7 @@ public final class SnapshotSeekingIterator
     @Override
     protected void seekInternal(Slice targetKey)
     {
-        iterator.seek(new InternalKey(targetKey, snapshot.getLastSequence(), ValueType.VALUE));
+        iterator.seek(internalKeyFactory.createInternalKey(targetKey, snapshot.getLastSequence(), ValueType.VALUE));
         findNextUserEntry(null);
     }
 

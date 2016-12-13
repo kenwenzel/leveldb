@@ -41,10 +41,11 @@ public class Level
 {
     private final int levelNumber;
     private final TableCache tableCache;
+    private final InternalKeyFactory internalKeyFactory;
     private final InternalKeyComparator internalKeyComparator;
     private final List<FileMetaData> files;
 
-    public Level(int levelNumber, List<FileMetaData> files, TableCache tableCache, InternalKeyComparator internalKeyComparator)
+    public Level(int levelNumber, List<FileMetaData> files, TableCache tableCache, InternalKeyFactory internalKeyFactory, InternalKeyComparator internalKeyComparator)
     {
         Preconditions.checkArgument(levelNumber >= 0, "levelNumber is negative");
         Preconditions.checkNotNull(files, "files is null");
@@ -53,6 +54,7 @@ public class Level
 
         this.files = newArrayList(files);
         this.tableCache = tableCache;
+        this.internalKeyFactory = internalKeyFactory;
         this.internalKeyComparator = internalKeyComparator;
         Preconditions.checkArgument(levelNumber >= 0, "levelNumber is negative");
         this.levelNumber = levelNumber;
@@ -164,7 +166,7 @@ public class Level
 
     public boolean someFileOverlapsRange(Slice smallestUserKey, Slice largestUserKey)
     {
-        InternalKey smallestInternalKey = new InternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
+        InternalKey smallestInternalKey = internalKeyFactory.createInternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
         int index = findFile(smallestInternalKey);
 
         UserComparator userComparator = internalKeyComparator.getUserComparator();

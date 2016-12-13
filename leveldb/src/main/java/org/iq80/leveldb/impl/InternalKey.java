@@ -31,7 +31,7 @@ public class InternalKey
     private final long sequenceNumber;
     private final ValueType valueType;
 
-    public InternalKey(Slice userKey, long sequenceNumber, ValueType valueType)
+    InternalKey(Slice userKey, long sequenceNumber, ValueType valueType)
     {
         Preconditions.checkNotNull(userKey, "userKey is null");
         Preconditions.checkArgument(sequenceNumber >= 0, "sequenceNumber is negative");
@@ -42,7 +42,7 @@ public class InternalKey
         this.valueType = valueType;
     }
 
-    public InternalKey(Slice data)
+    InternalKey(Slice data)
     {
         Preconditions.checkNotNull(data, "data is null");
         Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
@@ -50,11 +50,6 @@ public class InternalKey
         long packedSequenceAndType = data.getLong(data.length() - SIZE_OF_LONG);
         this.sequenceNumber = SequenceNumber.unpackSequenceNumber(packedSequenceAndType);
         this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
-    }
-
-    public InternalKey(byte[] data)
-    {
-        this(Slices.wrappedBuffer(data));
     }
 
     public Slice getUserKey()
