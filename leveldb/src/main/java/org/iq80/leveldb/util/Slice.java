@@ -171,6 +171,27 @@ public final class Slice
                 ((long) data[index + 6] & 0xff) << 48 |
                 ((long) data[index + 7] & 0xff) << 56;
     }
+    
+    /**
+     * Gets a 64-bit long integer in big-endian encoding at the specified absolute {@code index} in
+     * this buffer.
+     *
+     * @throws IndexOutOfBoundsException if the specified {@code index} is less than {@code 0} or
+     * {@code index + 8} is greater than {@code this.capacity}
+     */
+    public long getLongBigEndian(int index)
+    {
+        Preconditions.checkPositionIndexes(index, index + SIZE_OF_LONG, this.length);
+        index += offset;
+        return ((long) data[index] & 0xff) << 56 |
+                ((long) data[index + 1] & 0xff) << 48 |
+                ((long) data[index + 2] & 0xff) << 40 |
+                ((long) data[index + 3] & 0xff) << 32 |
+                ((long) data[index + 4] & 0xff) << 24 |
+                ((long) data[index + 5] & 0xff) << 16 |
+                ((long) data[index + 6] & 0xff) << 8 |
+                ((long) data[index + 7] & 0xff);
+    }
 
     /**
      * Transfers this buffer's data to the specified destination starting at
@@ -334,6 +355,27 @@ public final class Slice
         data[index + 5] = (byte) (value >>> 40);
         data[index + 6] = (byte) (value >>> 48);
         data[index + 7] = (byte) (value >>> 56);
+    }
+    
+    /**
+     * Sets the specified 64-bit long integer in big-endian encoding at the specified absolute
+     * {@code index} in this buffer.
+     *
+     * @throws IndexOutOfBoundsException if the specified {@code index} is less than {@code 0} or
+     * {@code index + 8} is greater than {@code this.capacity}
+     */
+    public void setLongBigEndian(int index, long value)
+    {
+        Preconditions.checkPositionIndexes(index, index + SIZE_OF_LONG, this.length);
+        index += offset;
+        data[index] = (byte) (value >>> 56);
+        data[index + 1] = (byte) (value >>> 48);
+        data[index + 2] = (byte) (value >>> 40);
+        data[index + 3] = (byte) (value >>> 32);
+        data[index + 4] = (byte) (value >>> 24);
+        data[index + 5] = (byte) (value >>> 16);
+        data[index + 6] = (byte) (value >>> 8);
+        data[index + 7] = (byte) (value);
     }
 
     /**

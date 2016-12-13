@@ -27,9 +27,9 @@ import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
 
 public class InternalKey
 {
-    private final Slice userKey;
-    private final long sequenceNumber;
-    private final ValueType valueType;
+    protected final Slice userKey;
+    protected final long sequenceNumber;
+    protected final ValueType valueType;
 
     InternalKey(Slice userKey, long sequenceNumber, ValueType valueType)
     {

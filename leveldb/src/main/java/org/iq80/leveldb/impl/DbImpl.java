@@ -52,6 +52,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.List;
@@ -132,17 +133,7 @@ public class DbImpl
         else {
             userComparator = new BytewiseComparator();
         }
-        internalKeyFactory = new InternalKeyFactory() {
-	    @Override
-	    public InternalKey createInternalKey(Slice data) {
-		return new InternalKey(data);
-	    }
-	    
-	    @Override
-	    public InternalKey createInternalKey(Slice userKey, long sequenceNumber, ValueType valueType) {
-		return new InternalKey(userKey, sequenceNumber, valueType);
-	    }
-	};
+        internalKeyFactory = options.timeSeriesMode() ? new TSInternalKeyFactory() : new DefaultInternalKeyFactory();
         internalKeyComparator = new InternalKeyComparator(userComparator);
         memTable = new MemTable(internalKeyFactory, internalKeyComparator);
         immutableMemTable = null;
@@ -696,11 +687,36 @@ public class DbImpl
             long sequenceEnd;
             if (updates.size() != 0) {
                 makeRoomForWrite(false);
-
+                
                 // Get sequence numbers for this change set
-                long sequenceBegin = versions.getLastSequence() + 1;
-                sequenceEnd = sequenceBegin + updates.size() - 1;
+                long sequenceBegin;
+                boolean timeSeriesMode = DbImpl.this.options.timeSeriesMode();
+		if (timeSeriesMode) {
+		    final long[] minMax = new long[] { versions.getLastSequence(), versions.getLastSequence() };
+		    updates.forEach(new Handler() {
+			void updateSequence(Slice key) {
+			    long seq = key.getLongBigEndian(key.length() - Long.BYTES);
+			    minMax[0] = Math.min(minMax[0], seq);
+			    minMax[1] = Math.max(minMax[1], seq);
+			}
+			
+			@Override
+			public void put(Slice key, Slice value) {
+			   updateSequence(key);
+			}
 
+			@Override
+			public void delete(Slice key) {
+			    updateSequence(key);
+			}
+		    });
+		    sequenceBegin = minMax[0];
+		    sequenceEnd = minMax[1];
+		} else {
+		    sequenceBegin = versions.getLastSequence() + 1;
+	            sequenceEnd = sequenceBegin + updates.size() - 1;
+		}
+                
                 // Reserve this sequence in the version set
                 versions.setLastSequence(sequenceEnd);
 
@@ -1378,13 +1394,17 @@ public class DbImpl
         @Override
         public void put(Slice key, Slice value)
         {
-            memTable.add(sequence++, VALUE, key, value);
+            long seq = key.getLongBigEndian(key.length() - Long.BYTES);
+//            memTable.add(sequence++, VALUE, key, value);
+            memTable.add(seq, VALUE, key, value);
         }
 
         @Override
         public void delete(Slice key)
         {
-            memTable.add(sequence++, DELETION, key, Slices.EMPTY_SLICE);
+            long seq = key.getLongBigEndian(key.length() - Long.BYTES);
+//          memTable.add(sequence++, DELETION, key, Slices.EMPTY_SLICE);
+            memTable.add(seq, DELETION, key, Slices.EMPTY_SLICE);
         }
     }
 
