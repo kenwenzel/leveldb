@@ -33,8 +33,14 @@ import org.iq80.leveldb.DBException;
 import org.iq80.leveldb.DBFactory;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
+import org.iq80.leveldb.impl.InternalKey;
 import org.iq80.leveldb.impl.Iq80DBFactory;
+import org.iq80.leveldb.impl.TSInternalKey;
+import org.iq80.leveldb.impl.TSInternalKeyFactory;
+import org.iq80.leveldb.impl.ValueType;
 import org.iq80.leveldb.util.FileUtils;
+import org.iq80.leveldb.util.Slices;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 /**
@@ -72,10 +78,25 @@ public class TimeSeriesTest {
     }
 
     @Test
+    public void testKeys() {
+	TSInternalKeyFactory f = new TSInternalKeyFactory();
+
+	long startTime = 1478252048736L;
+	for (int i = 0; i < 500 * 1000; i++) {
+	    long currentTime = startTime + i * 100;
+
+	    InternalKey key1 = f.createInternalKey(Slices.wrappedBuffer(bytes(currentTime)), i, ValueType.VALUE);
+	    InternalKey key2 = f.createInternalKey(key1.encode());
+
+	    Assert.assertEquals(key2, key1);
+	}
+    }
+
+    @Test
     public void testTimeSeries() throws IOException, DBException {
-	Options options = new Options().createIfMissing(true).compressionType(CompressionType.NONE)
+	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
 		.blockRestartInterval(500);
-	options.timeSeriesMode(true);
+	options.timeSeriesMode(false);
 
 	File path = getTestDirectory("testTimeSeries");
 	DB db = factory.open(path, options);
@@ -86,9 +107,9 @@ public class TimeSeriesTest {
 	double[] template = { 0.0, 0.0123, 0.0532324, 0.02, 0.03344, 0.13, 0.03 };
 
 	System.out.println("Adding");
-	for (int i = 0; i < 500 * 1000; i++) {
+	for (int i = 0; i < 5000 * 1000; i++) {
 	    if (i % 10000 == 0) {
-		System.out.println("  at: " + i);
+		System.out.println("  at: " + i); 
 	    }
 
 	    long currentTime = startTime + i * 100;

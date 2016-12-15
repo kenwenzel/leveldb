@@ -32,7 +32,6 @@ import java.util.Map.Entry;
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.FileMetaData.GET_LARGEST_USER_KEY;
-import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 
 // todo this class should be immutable
@@ -166,7 +165,7 @@ public class Level
 
     public boolean someFileOverlapsRange(Slice smallestUserKey, Slice largestUserKey)
     {
-        InternalKey smallestInternalKey = internalKeyFactory.createInternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, VALUE);
+        InternalKey smallestInternalKey = internalKeyFactory.createInternalKey(smallestUserKey, internalKeyFactory.maxSequenceNumber(), VALUE);
         int index = findFile(smallestInternalKey);
 
         UserComparator userComparator = internalKeyComparator.getUserComparator();

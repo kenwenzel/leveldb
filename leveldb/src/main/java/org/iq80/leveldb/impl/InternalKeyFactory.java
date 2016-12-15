@@ -23,4 +23,6 @@ public interface InternalKeyFactory {
     InternalKey createInternalKey(Slice userKey, long sequenceNumber, ValueType valueType);
 
     InternalKey createInternalKey(Slice data);
+    
+    long maxSequenceNumber();
 }

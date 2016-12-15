@@ -37,7 +37,6 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Ordering.natural;
 import static org.iq80.leveldb.impl.DbConstants.MAX_MEM_COMPACT_LEVEL;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.VersionSet.MAX_GRAND_PARENT_OVERLAP_BYTES;
 
 // todo this class should be immutable
@@ -189,8 +188,9 @@ public class Version
         if (!overlapInLevel(0, smallestUserKey, largestUserKey)) {
             // Push to next level if there is no overlap in next level,
             // and the #bytes overlapping in the level after that are limited.
-            InternalKey start = getInternalKeyFactory().createInternalKey(smallestUserKey, MAX_SEQUENCE_NUMBER, ValueType.VALUE);
-            InternalKey limit = getInternalKeyFactory().createInternalKey(largestUserKey, 0, ValueType.VALUE);
+            InternalKeyFactory factory = getInternalKeyFactory();
+            InternalKey start = factory.createInternalKey(smallestUserKey, factory.maxSequenceNumber(), ValueType.VALUE);
+            InternalKey limit = factory.createInternalKey(largestUserKey, 0, ValueType.VALUE);
             while (level < MAX_MEM_COMPACT_LEVEL) {
                 if (overlapInLevel(level + 1, smallestUserKey, largestUserKey)) {
                     break;

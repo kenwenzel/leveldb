@@ -21,19 +21,18 @@ import org.iq80.leveldb.util.Slice;
 import org.iq80.leveldb.util.SliceOutput;
 import org.iq80.leveldb.util.Slices;
 
-public class TSInternalKey extends InternalKey
-{
-    TSInternalKey(Slice userKey, long sequenceNumber, ValueType valueType)
-    {
-        super(userKey, sequenceNumber, valueType);
+public class TSInternalKey extends InternalKey {
+    public TSInternalKey(Slice userKey, long sequenceNumber, ValueType valueType) {
+	super(userKey, sequenceNumber, valueType);
     }
-    
+
     @Override
     public Slice encode() {
-	Slice slice = Slices.allocate(userKey.length() + 1);
-        SliceOutput sliceOutput = slice.output();
-        sliceOutput.writeBytes(userKey);
-        sliceOutput.writeByte(valueType.getPersistentId());
-        return slice;
+	Slice slice = Slices.allocate(Math.max(userKey.length(), 8) + 2);
+	SliceOutput sliceOutput = slice.output();
+	sliceOutput.writeBytes(userKey);
+	sliceOutput.writeByte((int) sequenceNumber);
+	sliceOutput.writeByte(valueType.getPersistentId());
+	return slice;
     }
 }

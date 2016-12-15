@@ -71,7 +71,6 @@ import static com.google.common.collect.Lists.newArrayList;
 import static org.iq80.leveldb.impl.DbConstants.L0_SLOWDOWN_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.L0_STOP_WRITES_TRIGGER;
 import static org.iq80.leveldb.impl.DbConstants.NUM_LEVELS;
-import static org.iq80.leveldb.impl.SequenceNumber.MAX_SEQUENCE_NUMBER;
 import static org.iq80.leveldb.impl.ValueType.DELETION;
 import static org.iq80.leveldb.impl.ValueType.VALUE;
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
@@ -209,6 +208,7 @@ public class DbImpl
             VersionEdit edit = new VersionEdit(internalKeyFactory);
             Collections.sort(logs);
             for (Long fileNumber : logs) {
+        	// TODO correctly compute maxSequence for time-series mode
                 long maxSequence = recoverLogFile(fileNumber, edit);
                 if (versions.getLastSequence() < maxSequence) {
                     versions.setLastSequence(maxSequence);
@@ -468,7 +468,7 @@ public class DbImpl
         Compaction compaction;
         if (manualCompaction != null) {
             compaction = versions.compactRange(manualCompaction.level,
-                    internalKeyFactory.createInternalKey(manualCompaction.begin, MAX_SEQUENCE_NUMBER, VALUE),
+                    internalKeyFactory.createInternalKey(manualCompaction.begin, internalKeyFactory.maxSequenceNumber(), VALUE),
                     internalKeyFactory.createInternalKey(manualCompaction.end, 0, DELETION));
         }
         else {
@@ -692,10 +692,12 @@ public class DbImpl
                 long sequenceBegin;
                 boolean timeSeriesMode = DbImpl.this.options.timeSeriesMode();
 		if (timeSeriesMode) {
-		    final long[] minMax = new long[] { versions.getLastSequence(), versions.getLastSequence() };
+		    final long[] minMax = new long[] { internalKeyFactory.maxSequenceNumber(), 0 };
 		    updates.forEach(new Handler() {
+			long localSequence = versions.getLastSequence() + 1;
+			
 			void updateSequence(Slice key) {
-			    long seq = key.getLongBigEndian(key.length() - Long.BYTES);
+			    long seq = TSInternalKeyFactory.calcSequenceNumber(key, localSequence++);
 			    minMax[0] = Math.min(minMax[0], seq);
 			    minMax[1] = Math.max(minMax[1], seq);
 			}
@@ -1068,11 +1070,12 @@ public class DbImpl
             Slice currentUserKey = null;
             boolean hasCurrentUserKey = false;
 
-            long lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+            long lastSequenceForKey = internalKeyFactory.maxSequenceNumber();
             while (iterator.hasNext() && !shuttingDown.get()) {
                 // always give priority to compacting the current mem table
                 mutex.lock();
                 try {
+                    System.out.println("COMPACT");
                     compactMemTableInternal();
                 }
                 finally {
@@ -1091,14 +1094,14 @@ public class DbImpl
                     // do not hide error keys
                     currentUserKey = null;
                     hasCurrentUserKey = false;
-                    lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+                    lastSequenceForKey = internalKeyFactory.maxSequenceNumber();
                 }
                 else {
                     if (!hasCurrentUserKey || internalKeyComparator.getUserComparator().compare(key.getUserKey(), currentUserKey) != 0) {
                         // First occurrence of this user key
                         currentUserKey = key.getUserKey();
                         hasCurrentUserKey = true;
-                        lastSequenceForKey = MAX_SEQUENCE_NUMBER;
+                        lastSequenceForKey = internalKeyFactory.maxSequenceNumber();
                     }
 
                     if (lastSequenceForKey <= compactionState.smallestSnapshot) {
@@ -1266,8 +1269,8 @@ public class DbImpl
     {
         Version v = versions.getCurrent();
 
-        InternalKey startKey = internalKeyFactory.createInternalKey(Slices.wrappedBuffer(range.start()), MAX_SEQUENCE_NUMBER, VALUE);
-        InternalKey limitKey = internalKeyFactory.createInternalKey(Slices.wrappedBuffer(range.limit()), MAX_SEQUENCE_NUMBER, VALUE);
+        InternalKey startKey = internalKeyFactory.createInternalKey(Slices.wrappedBuffer(range.start()), internalKeyFactory.maxSequenceNumber(), VALUE);
+        InternalKey limitKey = internalKeyFactory.createInternalKey(Slices.wrappedBuffer(range.limit()), internalKeyFactory.maxSequenceNumber(), VALUE);
         long startOffset = v.getApproximateOffsetOf(startKey);
         long limitOffset = v.getApproximateOffsetOf(limitKey);
 
@@ -1394,17 +1397,13 @@ public class DbImpl
         @Override
         public void put(Slice key, Slice value)
         {
-            long seq = key.getLongBigEndian(key.length() - Long.BYTES);
-//            memTable.add(sequence++, VALUE, key, value);
-            memTable.add(seq, VALUE, key, value);
+            memTable.add(sequence++, VALUE, key, value);
         }
 
         @Override
         public void delete(Slice key)
         {
-            long seq = key.getLongBigEndian(key.length() - Long.BYTES);
-//          memTable.add(sequence++, DELETION, key, Slices.EMPTY_SLICE);
-            memTable.add(seq, DELETION, key, Slices.EMPTY_SLICE);
+            memTable.add(sequence++, DELETION, key, Slices.EMPTY_SLICE);
         }
     }
 

@@ -42,16 +42,6 @@ public class InternalKey
         this.valueType = valueType;
     }
 
-    InternalKey(Slice data)
-    {
-        Preconditions.checkNotNull(data, "data is null");
-        Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
-        this.userKey = getUserKey(data);
-        long packedSequenceAndType = data.getLong(data.length() - SIZE_OF_LONG);
-        this.sequenceNumber = SequenceNumber.unpackSequenceNumber(packedSequenceAndType);
-        this.valueType = SequenceNumber.unpackValueType(packedSequenceAndType);
-    }
-
     public Slice getUserKey()
     {
         return userKey;
@@ -72,7 +62,7 @@ public class InternalKey
         Slice slice = Slices.allocate(userKey.length() + SIZE_OF_LONG);
         SliceOutput sliceOutput = slice.output();
         sliceOutput.writeBytes(userKey);
-        sliceOutput.writeLong(SequenceNumber.packSequenceAndValueType(sequenceNumber, valueType));
+        sliceOutput.writeLong(DefaultInternalKeyFactory.packSequenceAndValueType(sequenceNumber, valueType));
         return slice;
     }
 
@@ -129,9 +119,9 @@ public class InternalKey
         sb.append('}');
         return sb.toString();
     }
-
-    private static Slice getUserKey(Slice data)
+    
+    public int length() 
     {
-        return data.slice(0, data.length() - SIZE_OF_LONG);
+	return userKey.length() + SIZE_OF_LONG;
     }
 }

@@ -27,24 +27,48 @@ public class TSInternalKeyFactory implements InternalKeyFactory {
     @Override
     public InternalKey createInternalKey(Slice data) {
 	Preconditions.checkNotNull(data, "data is null");
-        Preconditions.checkArgument(data.length() >= SIZE_OF_LONG, "data must be at least %s bytes", SIZE_OF_LONG);
-        
-        Slice userKey = data.slice(0, data.length() - 1);
-        byte valueTypeNum = data.getByte(data.length() - 1);
-        ValueType valueType = ValueType.getValueTypeByPersistentId((byte) valueTypeNum);
-        long sequenceNumber = userKey.getLongBigEndian(userKey.length() - SIZE_OF_LONG);
-        return new TSInternalKey(userKey, sequenceNumber, valueType);
+	Preconditions.checkArgument(data.length() >= 1, "data must be at least %s bytes", 2);
+
+	Slice userKey = data.slice(0, data.length() - 2);
+	byte valueTypeNum = data.getByte(data.length() - 1);
+	ValueType valueType = ValueType.getValueTypeByPersistentId((byte) valueTypeNum);
+	long nr = getLongBigEndian(userKey, Math.max(userKey.length() - SIZE_OF_LONG, 0));
+	long sequenceNumber = ((nr << 8) | 0xFF & data.getByte(data.length() - 2)) & Long.MAX_VALUE;
+	return new TSInternalKey(userKey, sequenceNumber, valueType);
     }
-    
+
     @Override
     public InternalKey createInternalKey(Slice userKey, long sequenceNumber, ValueType valueType) {
-	// TODO this is not correct at the moment
-	userKey = userKey.copySlice();
-	if (sequenceNumber == SequenceNumber.MAX_SEQUENCE_NUMBER) {
-	    sequenceNumber = userKey.getLongBigEndian(userKey.length() - SIZE_OF_LONG);
-	    sequenceNumber++;
-	}
-	userKey.setLongBigEndian(userKey.length() - SIZE_OF_LONG, sequenceNumber);
+	long nr = getLongBigEndian(userKey, Math.max(userKey.length() - SIZE_OF_LONG, 0));
+	sequenceNumber = ((nr << 8) | 0xFF & sequenceNumber) & Long.MAX_VALUE;
 	return new TSInternalKey(userKey, sequenceNumber, valueType);
+    }
+    
+    public static long calcSequenceNumber(Slice userKey, long sequenceNumber) {
+	long nr = getLongBigEndian(userKey, Math.max(userKey.length() - SIZE_OF_LONG, 0));
+	sequenceNumber = ((nr << 8) | 0xFF & sequenceNumber) & Long.MAX_VALUE;
+	return sequenceNumber;
+    }
+
+    protected static long getLongBigEndian(Slice slice, int index) {
+	index += slice.getRawOffset();
+	byte[] data = slice.getRawArray();
+	long result = 0;
+	int shift = 56;
+	while (shift >= 0) {
+	    if (index < data.length) {
+		result |= ((long) data[index] & 0xff) << shift;
+	    } else {
+		result |= ((long) 0xff) << shift;
+	    }
+	    index += 1;
+	    shift -= 8;
+	}
+	return result;
+    }
+
+    @Override
+    public long maxSequenceNumber() {
+	return Long.MAX_VALUE;
     }
 }

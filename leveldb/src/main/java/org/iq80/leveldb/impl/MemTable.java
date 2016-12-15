@@ -27,8 +27,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.iq80.leveldb.util.SizeOf.SIZE_OF_LONG;
-
 public class MemTable
         implements SeekingIterable<InternalKey, Slice>
 {
@@ -51,7 +49,7 @@ public class MemTable
     {
         return approximateMemoryUsage.get();
     }
-
+    
     public void add(long sequenceNumber, ValueType valueType, Slice key, Slice value)
     {
         Preconditions.checkNotNull(valueType, "valueType is null");
@@ -61,7 +59,7 @@ public class MemTable
         InternalKey internalKey = internalKeyFactory.createInternalKey(key, sequenceNumber, valueType);
         table.put(internalKey, value);
 
-        approximateMemoryUsage.addAndGet(key.length() + SIZE_OF_LONG + value.length());
+        approximateMemoryUsage.addAndGet(internalKey.length() + value.length());
     }
 
     public LookupResult get(LookupKey key)
