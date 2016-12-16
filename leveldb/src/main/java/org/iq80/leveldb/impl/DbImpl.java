@@ -52,7 +52,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.List;
@@ -134,7 +133,7 @@ public class DbImpl
         }
         internalKeyFactory = options.timeSeriesMode() ? new TSInternalKeyFactory() : new DefaultInternalKeyFactory();
         internalKeyComparator = new InternalKeyComparator(userComparator);
-        memTable = new MemTable(internalKeyFactory, internalKeyComparator);
+        memTable = new MemTable(internalKeyComparator);
         immutableMemTable = null;
 
         ThreadFactory compactionThreadFactory = new ThreadFactoryBuilder()
@@ -545,14 +544,21 @@ public class DbImpl
 
                 // apply entries to memTable
                 if (memTable == null) {
-                    memTable = new MemTable(internalKeyFactory, internalKeyComparator);
+                    memTable = new MemTable(internalKeyComparator);
                 }
-                writeBatch.forEach(new InsertIntoHandler(memTable, sequenceBegin));
+                final long[] lastSequence = { 0 };
+                writeBatch.forEach(new InsertIntoHandler(internalKeyFactory, memTable, sequenceBegin) {
+                    @Override
+                    protected void addToTable(InternalKey internalKey, Slice value) {
+                        super.addToTable(internalKey, value);
+                        lastSequence[0] = Math.max(lastSequence[0], internalKey.getSequenceNumber());
+                    }
+                });
 
                 // update the maxSequence
-                long lastSequence = sequenceBegin + updateSize - 1;
-                if (lastSequence > maxSequence) {
-                    maxSequence = lastSequence;
+//                long lastSequence = sequenceBegin + updateSize - 1;
+                if (lastSequence[0] > maxSequence) {
+                    maxSequence = lastSequence[0];
                 }
 
                 // flush mem table if necessary
@@ -692,7 +698,7 @@ public class DbImpl
                 long sequenceBegin;
                 boolean timeSeriesMode = DbImpl.this.options.timeSeriesMode();
 		if (timeSeriesMode) {
-		    final long[] minMax = new long[] { internalKeyFactory.maxSequenceNumber(), 0 };
+		    final long[] minMax = new long[] { internalKeyFactory.maxSequenceNumber(), versions.getLastSequence() + 1 };
 		    updates.forEach(new Handler() {
 			long localSequence = versions.getLastSequence() + 1;
 			
@@ -732,7 +738,7 @@ public class DbImpl
                 }
 
                 // Update memtable
-                updates.forEach(new InsertIntoHandler(memTable, sequenceBegin));
+                updates.forEach(new InsertIntoHandler(internalKeyFactory, memTable, sequenceBegin));
             }
             else {
                 sequenceEnd = versions.getLastSequence();
@@ -909,7 +915,7 @@ public class DbImpl
 
                 // create a new mem table
                 immutableMemTable = memTable;
-                memTable = new MemTable(internalKeyFactory, internalKeyComparator);
+                memTable = new MemTable(internalKeyComparator);
 
                 // Do not force another compaction there is space available
                 force = false;
@@ -1075,7 +1081,6 @@ public class DbImpl
                 // always give priority to compacting the current mem table
                 mutex.lock();
                 try {
-                    System.out.println("COMPACT");
                     compactMemTableInternal();
                 }
                 finally {
@@ -1386,24 +1391,31 @@ public class DbImpl
             implements Handler
     {
         private long sequence;
+        private final InternalKeyFactory internalKeyFactory;
         private final MemTable memTable;
 
-        public InsertIntoHandler(MemTable memTable, long sequenceBegin)
+        public InsertIntoHandler(InternalKeyFactory internalKeyFactory, MemTable memTable, long sequenceBegin)
         {
+            this.internalKeyFactory = internalKeyFactory;
             this.memTable = memTable;
             this.sequence = sequenceBegin;
+        }
+        
+        protected void addToTable(InternalKey internalKey, Slice value)
+        {
+            memTable.add(internalKey, value);
         }
 
         @Override
         public void put(Slice key, Slice value)
         {
-            memTable.add(sequence++, VALUE, key, value);
+            addToTable(internalKeyFactory.createInternalKey(key, sequence++, VALUE), value);
         }
 
         @Override
         public void delete(Slice key)
         {
-            memTable.add(sequence++, DELETION, key, Slices.EMPTY_SLICE);
+            addToTable(internalKeyFactory.createInternalKey(key, sequence++, DELETION), Slices.EMPTY_SLICE);
         }
     }
 

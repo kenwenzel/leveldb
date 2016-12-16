@@ -32,12 +32,10 @@ public class MemTable
 {
     private final ConcurrentSkipListMap<InternalKey, Slice> table;
     private final AtomicLong approximateMemoryUsage = new AtomicLong();
-    private final InternalKeyFactory internalKeyFactory;
 
-    public MemTable(InternalKeyFactory internalKeyFactory, InternalKeyComparator internalKeyComparator)
+    public MemTable(InternalKeyComparator internalKeyComparator)
     {
         table = new ConcurrentSkipListMap<>(internalKeyComparator);
-        this.internalKeyFactory = internalKeyFactory;
     }
 
     public boolean isEmpty()
@@ -50,18 +48,15 @@ public class MemTable
         return approximateMemoryUsage.get();
     }
     
-    public void add(long sequenceNumber, ValueType valueType, Slice key, Slice value)
+    public void add(InternalKey key, Slice value)
     {
-        Preconditions.checkNotNull(valueType, "valueType is null");
         Preconditions.checkNotNull(key, "key is null");
-        Preconditions.checkNotNull(valueType, "valueType is null");
 
-        InternalKey internalKey = internalKeyFactory.createInternalKey(key, sequenceNumber, valueType);
-        table.put(internalKey, value);
+        table.put(key, value);
 
-        approximateMemoryUsage.addAndGet(internalKey.length() + value.length());
+        approximateMemoryUsage.addAndGet(key.length() + value.length());
     }
-
+    
     public LookupResult get(LookupKey key)
     {
         Preconditions.checkNotNull(key, "key is null");
