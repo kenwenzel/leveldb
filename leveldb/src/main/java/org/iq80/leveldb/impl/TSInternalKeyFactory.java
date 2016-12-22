@@ -39,9 +39,12 @@ public class TSInternalKeyFactory implements InternalKeyFactory {
 
     @Override
     public InternalKey createInternalKey(Slice userKey, long sequenceNumber, ValueType valueType) {
+	// TODO find a working way to handle multiple sequence numbers
+	sequenceNumber = 0xFF;
+	
 	long nr = getLongBigEndian(userKey, Math.max(userKey.length() - SIZE_OF_LONG, 0));
-	sequenceNumber = ((nr << 8) | 0xFF & sequenceNumber) & Long.MAX_VALUE;
-	return new TSInternalKey(userKey, sequenceNumber, valueType);
+	long newSequenceNumber = ((nr << 8) | 0xFF & sequenceNumber) & Long.MAX_VALUE;
+	return new TSInternalKey(userKey, newSequenceNumber, valueType);
     }
     
     public static long calcSequenceNumber(Slice userKey, long sequenceNumber) {

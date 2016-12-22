@@ -30,7 +30,8 @@ public class Options
     private CompressionType compressionType = CompressionType.SNAPPY;
     private boolean verifyChecksums = true;
     private boolean paranoidChecks;
-    private boolean timeSeriesMode = false;
+    private boolean timeSeriesMode;
+    private boolean reverseOrdering;
     private DBComparator comparator;
     private Logger logger;
     private long cacheSize;
@@ -183,6 +184,17 @@ public class Options
     public Options timeSeriesMode(boolean timeSeriesMode)
     {
         this.timeSeriesMode = timeSeriesMode;
+        return this;
+    }
+    
+    public boolean reverseOrdering()
+    {
+        return reverseOrdering;
+    }
+
+    public Options reverseOrdering(boolean reverseOrdering)
+    {
+        this.reverseOrdering = reverseOrdering;
         return this;
     }
 }

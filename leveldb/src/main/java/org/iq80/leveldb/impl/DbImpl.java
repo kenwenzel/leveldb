@@ -36,6 +36,7 @@ import org.iq80.leveldb.impl.MemTable.MemTableIterator;
 import org.iq80.leveldb.impl.WriteBatchImpl.Handler;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.CustomUserComparator;
+import org.iq80.leveldb.table.ReverseBytewiseComparator;
 import org.iq80.leveldb.table.TableBuilder;
 import org.iq80.leveldb.table.UserComparator;
 import org.iq80.leveldb.util.DbIterator;
@@ -129,7 +130,7 @@ public class DbImpl
             userComparator = new CustomUserComparator(comparator);
         }
         else {
-            userComparator = new BytewiseComparator();
+            userComparator = options.reverseOrdering() ? new ReverseBytewiseComparator() : new BytewiseComparator();
         }
         internalKeyFactory = options.timeSeriesMode() ? new TSInternalKeyFactory() : new DefaultInternalKeyFactory();
         internalKeyComparator = new InternalKeyComparator(userComparator);
@@ -700,7 +701,7 @@ public class DbImpl
 		if (timeSeriesMode) {
 		    final long[] minMax = new long[] { internalKeyFactory.maxSequenceNumber(), versions.getLastSequence() + 1 };
 		    updates.forEach(new Handler() {
-			long localSequence = versions.getLastSequence() + 1;
+			long localSequence = minMax[1];
 			
 			void updateSequence(Slice key) {
 			    long seq = TSInternalKeyFactory.calcSequenceNumber(key, localSequence++);
