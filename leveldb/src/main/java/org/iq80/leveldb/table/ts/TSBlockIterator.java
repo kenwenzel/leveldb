@@ -19,7 +19,6 @@ package org.iq80.leveldb.table.ts;
 
 import static org.iq80.leveldb.util.SizeOf.SIZE_OF_INT;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Comparator;
@@ -69,7 +68,7 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 
     protected FpcCompressor getDoubleCompressor() {
 	if (doubleCompressor == null) {
-	    doubleCompressor = new FpcCompressor();
+	    doubleCompressor = new FpcCompressor(2048);
 	}
 	return doubleCompressor;
     }
@@ -198,7 +197,8 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	// read entry header
 	int sharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);
 	int nonSharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);
-	int valueLength = VariableLengthQuantity.readVariableLengthInt(data);
+	int valueLength;
+	// int valueLength = VariableLengthQuantity.readVariableLengthInt(data);
 
 	// read key
 	Slice key = Slices.allocate(sharedKeyLength + nonSharedKeyLength);
@@ -216,11 +216,51 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	byte header = data.readByte();
 	char valueType = (char) ((header & 0x3F) + 64);
 	switch (valueType) {
+	case 'B':
+	    valueLength = java.lang.Byte.BYTES;
+	    break;
+	case 'C':
+	    valueLength = java.lang.Character.BYTES;
+	    break;
+	case 'd':
+	    // compressed double value encoded in previous entry
+	    valueLength = 0;
+	    break;
+	case 'D':
+	    int compressionHeader = data.readByte();
+	    valueLength = FpcCompressor.size(compressionHeader);
+	    // reset position of input stream
+	    data.setPosition(startPos + 1);
+	    break;
+	case 'F':
+	    valueLength = java.lang.Float.BYTES;
+	    break;
+	case 'I':
+	    valueLength = java.lang.Integer.BYTES;
+	    break;
+	case 'J':
+	    valueLength = java.lang.Long.BYTES;
+	    break;
+	case 'S':
+	    valueLength = java.lang.Short.BYTES;
+	    break;
+	case 'Z':
+	    valueLength = java.lang.Byte.BYTES;
+	    break;
+	case '"':
+	    valueLength = VariableLengthQuantity.readVariableLengthInt(data);
+	    break;
+	default:
+	    throw new IllegalArgumentException("Unexpected value type marker: " + valueType);
+	}
+
+	switch (valueType) {
 	// use delta compression for double values
+	case 'd':
 	case 'D':
 	    if (nextValue != null) {
 		// TODO check why this is necessary
-		data.setPosition(startPos + valueLength);
+		data.setPosition(startPos + 1 + valueLength);
 		value = nextValue;
 		nextValue = null;
 	    } else {
@@ -242,9 +282,11 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 		data.setPosition(bb.position());
 	    }
 	    break;
+	case '"':
+	    // TODO read string
 	default:
 	    data.setPosition(startPos);
-	    value = data.readSlice(valueLength);
+	    value = data.readSlice(1 + valueLength);
 	    value.setByte(0, (byte) valueType);
 	    break;
 	}

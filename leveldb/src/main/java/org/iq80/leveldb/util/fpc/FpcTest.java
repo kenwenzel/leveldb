@@ -21,7 +21,7 @@ import java.nio.ByteBuffer;
 
 public class FpcTest {
 	public static void main(String... args) {
-		FpcCompressor comp = new FpcCompressor();
+		FpcCompressor comp = new FpcCompressor(1 << 16);
 
 		double[] template = { 0.0, 0.0123, 0.0532324, 0.02, 0.03344 };
 		double[] values = new double[31];

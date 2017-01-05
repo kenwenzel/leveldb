@@ -17,28 +17,28 @@
  */
 package org.iq80.leveldb.util.fpc;
 
-import java.util.Arrays;
-
 public class FcmPredictor {
 
-	private long[] table;
+	private SparseLongArray table;
+	private int tableLength;
 	private int fcm_hash;
 
 	public FcmPredictor(int logOfTableSize) {
-		table = new long[1 << logOfTableSize];
+	    	tableLength = 1 << logOfTableSize;
+		table = new SparseLongArray();
 	}
 
 	public long getPrediction() {
-		return table[fcm_hash];
+		return table.get(fcm_hash);
 	}
 
 	public void update(long true_value) {
-		table[fcm_hash] = true_value;
-		fcm_hash = (int) (((fcm_hash << 6) ^ (true_value >> 48)) & (table.length - 1));
+		table.put(fcm_hash, true_value);
+		fcm_hash = (int) (((fcm_hash << 6) ^ (true_value >> 48)) & (tableLength - 1));
 	}
 	
 	public void reset() {
 	    fcm_hash = 0;
-	    Arrays.fill(table, 0);
+	    table.clear();
 	}
 }

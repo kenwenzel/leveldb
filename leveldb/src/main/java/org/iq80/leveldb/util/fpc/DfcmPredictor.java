@@ -17,31 +17,31 @@
  */
 package org.iq80.leveldb.util.fpc;
 
-import java.util.Arrays;
-
 public class DfcmPredictor {
 
-    private long[] table;
+    private SparseLongArray table;
+    private int tableLength;
     private int dfcm_hash;
     private long lastValue;
 
     public DfcmPredictor(int logOfTableSize) {
-	table = new long[1 << logOfTableSize];
+	tableLength = 1 << logOfTableSize;
+	table = new SparseLongArray();
     }
 
     public long getPrediction() {
-	return table[dfcm_hash] + lastValue;
+	return table.get(dfcm_hash) + lastValue;
     }
 
     public void update(long true_value) {
-	table[dfcm_hash] = true_value - lastValue;
-	dfcm_hash = (int) (((dfcm_hash << 2) ^ ((true_value - lastValue) >> 40)) & (table.length - 1));
+	table.put(dfcm_hash, true_value - lastValue);
+	dfcm_hash = (int) (((dfcm_hash << 2) ^ ((true_value - lastValue) >> 40)) & (tableLength - 1));
 	lastValue = true_value;
     }
 
     public void reset() {
 	lastValue = 0;
 	dfcm_hash = 0;
-	Arrays.fill(table, 0);
+	table.clear();
     }
 }

@@ -55,7 +55,7 @@ public class TSBlockBuilder extends BlockBuilder {
 	}
     }
 
-    protected void writeRaw(Slice key, Slice value) {
+    protected void writeRaw(Slice key, byte header, Slice value) {
 	Preconditions.checkState(!finished, "block is finished");
 	// Preconditions.checkPositionIndex(restartBlockEntryCount,
 	// blockRestartInterval);
@@ -84,11 +84,14 @@ public class TSBlockBuilder extends BlockBuilder {
 	// write "<shared><non_shared><value_size>"
 	VariableLengthQuantity.writeVariableLengthInt(sharedKeyBytes, block);
 	VariableLengthQuantity.writeVariableLengthInt(nonSharedKeyBytes, block);
-	VariableLengthQuantity.writeVariableLengthInt(value.length(), block);
+	// VariableLengthQuantity.writeVariableLengthInt(value.length(), block);
 
 	// write non-shared key bytes
 	block.writeBytes(key, sharedKeyBytes, nonSharedKeyBytes);
 
+	// write value header
+	block.write(header);
+	
 	// write value bytes
 	block.writeBytes(value, 0, value.length());
 
@@ -107,10 +110,9 @@ public class TSBlockBuilder extends BlockBuilder {
 	    bb.get();
 	    double prev = bb.getDouble();
 	    encodingBuffer.clear();
-	    encodingBuffer.put(encodeHeader('D', true));
 	    getDoubleCompressor().encodeAndPad(encodingBuffer, prev);
 	    Slice newValue = new Slice(encodingBuffer.array(), 0, encodingBuffer.position());
-	    writeRaw(holdKey, newValue);
+	    writeRaw(holdKey, encodeHeader('D', true), newValue);
 	    holdKey = null;
 	    holdValue = null;
 	}
@@ -118,7 +120,7 @@ public class TSBlockBuilder extends BlockBuilder {
 
     protected FpcCompressor getDoubleCompressor() {
 	if (doubleCompressor == null) {
-	    doubleCompressor = new FpcCompressor();
+	    doubleCompressor = new FpcCompressor(2048);
 	}
 	return doubleCompressor;
     }
@@ -158,13 +160,12 @@ public class TSBlockBuilder extends BlockBuilder {
 		    bb.get();
 		    double next = bb.getDouble();
 		    encodingBuffer.clear();
-		    encodingBuffer.put(encodeHeader('D', false));
 		    getDoubleCompressor().encode(encodingBuffer, prev, next);
 
 		    Slice newValue = new Slice(encodingBuffer.array(), 0, encodingBuffer.position());
-		    writeRaw(holdKey, newValue);
+		    writeRaw(holdKey, encodeHeader('D', false), newValue);
 		    // write only 'D' as indicator for a double value
-		    writeRaw(key, new Slice(new byte[] { encodeHeader('D', false) }));
+		    writeRaw(key, encodeHeader('d', false), new Slice(new byte[0]));
 		    holdKey = null;
 		    holdValue = null;
 		} else {
@@ -174,12 +175,11 @@ public class TSBlockBuilder extends BlockBuilder {
 		break;
 	    default:
 		writePrevValue();
-		value.setByte(0, encodeHeader(valueType, false));
-		writeRaw(key, value);
+		writeRaw(key, encodeHeader(valueType, false), value.slice(1, value.length() - 1));
 		break;
 	    }
 	} else {
-	    writeRaw(key, value);
+	    writeRaw(key, encodeHeader('N', false), value);
 	}
     }
 
