@@ -98,7 +98,7 @@ public class TimeSeriesTest {
     public void testTimeSeries() throws IOException, DBException {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
 		.blockRestartInterval(500);
-	options.timeSeriesMode(false);
+	options.timeSeriesMode(true);
 
 	File path = getTestDirectory("testTimeSeries");
 	DB db = factory.open(path, options);
@@ -106,7 +106,7 @@ public class TimeSeriesTest {
 	Random rnd = new Random(200);
 	long startTime = 1478252048736L;
 
-	int nrOfValues = 1 * 1000 * 1000;
+	int nrOfValues = 5 * 1000 * 1000;
 
 	// holds generated data
 	List<Pair<byte[], byte[]>> recordedEntries = new ArrayList<>();
@@ -159,7 +159,7 @@ public class TimeSeriesTest {
 	}
     }
 
-    @Test
+//    @Test
     public void testTimeSeriesReverse() throws IOException, DBException {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
 		.blockRestartInterval(500);

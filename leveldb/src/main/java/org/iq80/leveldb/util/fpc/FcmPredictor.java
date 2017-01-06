@@ -19,13 +19,13 @@ package org.iq80.leveldb.util.fpc;
 
 public class FcmPredictor {
 
-	private SparseLongArray table;
+	private IntLongMap table;
 	private int tableLength;
 	private int fcm_hash;
 
 	public FcmPredictor(int logOfTableSize) {
 	    	tableLength = 1 << logOfTableSize;
-		table = new SparseLongArray();
+		table = new IntLongMap(10, 0.8f);
 	}
 
 	public long getPrediction() {

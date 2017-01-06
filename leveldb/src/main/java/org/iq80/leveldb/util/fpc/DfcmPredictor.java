@@ -19,14 +19,14 @@ package org.iq80.leveldb.util.fpc;
 
 public class DfcmPredictor {
 
-    private SparseLongArray table;
+    private IntLongMap table;
     private int tableLength;
     private int dfcm_hash;
     private long lastValue;
 
     public DfcmPredictor(int logOfTableSize) {
 	tableLength = 1 << logOfTableSize;
-	table = new SparseLongArray();
+	table = new IntLongMap(10, 0.8f);
     }
 
     public long getPrediction() {
