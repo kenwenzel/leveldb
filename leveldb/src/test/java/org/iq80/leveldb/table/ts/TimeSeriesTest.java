@@ -220,16 +220,25 @@ public class TimeSeriesTest {
     public void testRandomTime() throws IOException, DBException {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
 		.blockRestartInterval(500);
-	options.timeSeriesMode(false);
-	options.reverseOrdering(false);
+	options.timeSeriesMode(true);
+	options.reverseOrdering(true);
 
 	File path = getTestDirectory("testRandomTime");
 	DB db = factory.open(path, options);
 
 	Random rnd = new Random(200);
-	long startTime = 1478252048736L;
+	long lastTime = 1478252048736L;
 
 	int nrOfValues = 100 * 1000;
+	List<byte[]> keys = new ArrayList<>();
+	for (int i = 0; i < nrOfValues; i++) {
+	    long currentTime = lastTime + 1 + Math.abs(rnd.nextInt(10000));
+	    byte[] keyBytes = bytes(currentTime);
+	    keys.add(keyBytes);
+	    lastTime = currentTime;
+	}
+	
+	Collections.shuffle(keys, rnd);
 
 	// holds generated data
 	List<Pair<byte[], byte[]>> recordedEntries = new ArrayList<>();
@@ -237,13 +246,8 @@ public class TimeSeriesTest {
 	int toAdd = 0;
 	Random rnd2 = new Random(200);
 
-	System.out.println("Adding");
-	for (int i = 0; i < nrOfValues; i++) {
-	    if (i % 10000 == 0) {
-		System.out.println("  at: " + i);
-	    }
-
-	    long currentTime = startTime + rnd.nextInt(100000);
+	System.out.println("Adding random");
+	for (byte[] key : keys) {
 	    int value = rnd.nextInt(1000);
 	    byte[] valueBytes = ByteBuffer.allocate(1 + Integer.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'I')
 		    .putInt(value).array();
@@ -251,12 +255,12 @@ public class TimeSeriesTest {
 	    if (toAdd-- > 0) {
 		// seek always
 		recordedEntries.add(null);
-		recordedEntries.add(new Pair<>(bytes(currentTime), valueBytes));
+		recordedEntries.add(new Pair<>(key, valueBytes));
 	    } else if (rnd2.nextDouble() < 0.01) {
 		toAdd = rnd2.nextInt(30);
 	    }
 
-	    db.put(bytes(currentTime), valueBytes);
+	    db.put(key, valueBytes);
 	}
 
 
@@ -264,8 +268,6 @@ public class TimeSeriesTest {
 	db = factory.open(path, options);
 
 	System.out.println("Reading random");
-	// reverse the recorded entries since values are stored in reverse order
-//	Collections.reverse(recordedEntries);
 	readElements(recordedEntries, db.iterator());
 
 	db.close();
@@ -279,7 +281,6 @@ public class TimeSeriesTest {
 		seek = true;
 	    } else {
 		if (seek) {
-		    System.out.println("SEEK " + Arrays.toString(testEntry.key));
 		    it.seek(testEntry.key);
 		    seek = false;
 		}
