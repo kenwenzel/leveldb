@@ -215,6 +215,7 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	byte header = data.readByte();
 	// use lower 7 bits as header
 	char valueType = (char) (header & 0x7F);
+	boolean variableLength = false;
 
 	// value with fixed length
 	switch (valueType) {
@@ -252,6 +253,7 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	default:
 	    // string or unknown value with variable length
 	    valueLength = VariableLengthQuantity.readVariableLengthInt(data);
+	    variableLength = true;
 	}
 
 	switch (valueType) {
@@ -283,8 +285,18 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	    }
 	    break;
 	default:
-	    data.setPosition(startPos);
-	    value = data.readSlice(1 + valueLength);
+	    // TODO maybe improve the encoding and add header after length to avoid copying the data
+	    if (variableLength) {
+		Slice valueSlice = data.readSlice(valueLength);
+		byte[] rawData = valueSlice.getRawArray();
+		byte[] newSlice = new byte[valueSlice.length() + 1];
+		System.arraycopy(rawData, valueSlice.getRawOffset(), newSlice, 1, valueSlice.length());
+		newSlice[0] = (byte) valueType;
+		value = new Slice(newSlice);
+	    } else {
+		data.setPosition(startPos);
+		value = data.readSlice(1 + valueLength);
+	    }
 	    break;
 	}
 

@@ -256,8 +256,17 @@ public class TimeSeriesTest {
 		byte[] keyBytes = bytes(finalKey);
 
 		int value = rnd.nextInt(1000);
-		byte[] valueBytes = ByteBuffer.allocate(1 + Long.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'J')
-			.putLong(value).array();
+		byte[] valueBytes;
+		if (rnd.nextBoolean()) {
+		    // long value
+		    valueBytes = ByteBuffer.allocate(1 + Long.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'J')
+				.putLong(value).array();
+		} else {
+		    // some black-box object
+		    valueBytes = new byte[1 + Math.abs(rnd.nextInt(20))];
+		    rnd.nextBytes(valueBytes);
+		    valueBytes[0] = 'O';
+		}
 
 		if (toAdd-- > 0) {
 		    recordedEntries.add(new Pair<>(keyBytes, valueBytes));
