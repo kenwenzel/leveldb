@@ -198,7 +198,6 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	int sharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);
 	int nonSharedKeyLength = VariableLengthQuantity.readVariableLengthInt(data);
 	int valueLength;
-	// int valueLength = VariableLengthQuantity.readVariableLengthInt(data);
 
 	// read key
 	Slice key = Slices.allocate(sharedKeyLength + nonSharedKeyLength);
@@ -214,7 +213,10 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	Slice value;
 	int startPos = data.position();
 	byte header = data.readByte();
-	char valueType = (char) ((header & 0x3F) + 64);
+	// use lower 7 bits as header
+	char valueType = (char) (header & 0x7F);
+
+	// value with fixed length
 	switch (valueType) {
 	case 'B':
 	    valueLength = java.lang.Byte.BYTES;
@@ -247,11 +249,9 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 	case 'Z':
 	    valueLength = java.lang.Byte.BYTES;
 	    break;
-	case '"':
-	    valueLength = VariableLengthQuantity.readVariableLengthInt(data);
-	    break;
 	default:
-	    throw new IllegalArgumentException("Unexpected value type marker: " + valueType);
+	    // string or unknown value with variable length
+	    valueLength = VariableLengthQuantity.readVariableLengthInt(data);
 	}
 
 	switch (valueType) {
@@ -269,7 +269,7 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 		byte[] firstDouble = ByteBuffer.allocate(1 + Double.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'D')
 			.putDouble(decodeBuffer[0]).array();
 		value = new Slice(firstDouble);
-		boolean isSingleValue = (header & (1 << 7)) != 0;
+		boolean isSingleValue = (header & TSBlock.HEADER_LAST_VALUE) != 0;
 		if (isSingleValue) {
 		    nextValue = null;
 		    doubleCompressor.reset();
@@ -282,12 +282,9 @@ public class TSBlockIterator implements SeekingIterator<Slice, Slice> {
 		data.setPosition(bb.position());
 	    }
 	    break;
-	case '"':
-	    // TODO read string
 	default:
 	    data.setPosition(startPos);
 	    value = data.readSlice(1 + valueLength);
-	    value.setByte(0, (byte) valueType);
 	    break;
 	}
 

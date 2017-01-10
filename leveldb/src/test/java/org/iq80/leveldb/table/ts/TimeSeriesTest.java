@@ -25,7 +25,6 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
@@ -50,6 +49,8 @@ import org.testng.annotations.Test;
  * Test the implementation of time series data.
  */
 public class TimeSeriesTest {
+    private static final boolean TIME_SERIES_MODE = true;
+    
     private final File databaseDir = FileUtils.createTempDir("leveldb");
 
     public static byte[] bytes(long value) {
@@ -99,7 +100,7 @@ public class TimeSeriesTest {
     public void testTimeSeries() throws IOException, DBException {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
 		.blockRestartInterval(500);
-	options.timeSeriesMode(true);
+	options.timeSeriesMode(TIME_SERIES_MODE);
 
 	File path = getTestDirectory("testTimeSeries");
 	DB db = factory.open(path, options);
@@ -164,7 +165,7 @@ public class TimeSeriesTest {
     public void testTimeSeriesReverse() throws IOException, DBException {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
 		.blockRestartInterval(500);
-	options.timeSeriesMode(true);
+	options.timeSeriesMode(TIME_SERIES_MODE);
 	options.reverseOrdering(true);
 
 	File path = getTestDirectory("testTimeSeriesReverse");
@@ -219,8 +220,8 @@ public class TimeSeriesTest {
     @Test
     public void testRandomTime() throws IOException, DBException {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
-		.blockRestartInterval(500);
-	options.timeSeriesMode(true);
+		.blockRestartInterval(5);
+	options.timeSeriesMode(TIME_SERIES_MODE);
 	options.reverseOrdering(true);
 
 	File path = getTestDirectory("testRandomTime");
@@ -249,8 +250,8 @@ public class TimeSeriesTest {
 	System.out.println("Adding random");
 	for (byte[] key : keys) {
 	    int value = rnd.nextInt(1000);
-	    byte[] valueBytes = ByteBuffer.allocate(1 + Integer.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'I')
-		    .putInt(value).array();
+	    byte[] valueBytes = ByteBuffer.allocate(1 + Long.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'J')
+		    .putLong(value).array();
 
 	    if (toAdd-- > 0) {
 		// seek always

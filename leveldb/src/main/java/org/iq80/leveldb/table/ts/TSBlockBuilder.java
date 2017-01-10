@@ -55,7 +55,7 @@ public class TSBlockBuilder extends BlockBuilder {
 	}
     }
 
-    protected void writeRaw(Slice key, byte header, Slice value) {
+    protected void writeRaw(Slice key, int header, Slice value) {
 	Preconditions.checkState(!finished, "block is finished");
 	// Preconditions.checkPositionIndex(restartBlockEntryCount,
 	// blockRestartInterval);
@@ -84,14 +84,19 @@ public class TSBlockBuilder extends BlockBuilder {
 	// write "<shared><non_shared><value_size>"
 	VariableLengthQuantity.writeVariableLengthInt(sharedKeyBytes, block);
 	VariableLengthQuantity.writeVariableLengthInt(nonSharedKeyBytes, block);
-	// VariableLengthQuantity.writeVariableLengthInt(value.length(), block);
+	// value length is only written for certain variable-length values
 
 	// write non-shared key bytes
 	block.writeBytes(key, sharedKeyBytes, nonSharedKeyBytes);
 
 	// write value header
-	block.write(header);
-	
+	block.writeByte(header);
+
+	// write value length if required
+	if ((header & TSBlock.HEADER_VALUE_LENGTH_ENCODED) != 0) {
+	    VariableLengthQuantity.writeVariableLengthInt(value.length(), block);
+	}
+
 	// write value bytes
 	block.writeBytes(value, 0, value.length());
 
@@ -125,10 +130,30 @@ public class TSBlockBuilder extends BlockBuilder {
 	return doubleCompressor;
     }
 
-    protected byte encodeHeader(char valueType, boolean isLast) {
-	byte header = (byte) (((byte) valueType - 64) & 0x3F);
-	if (isLast) {
-	    header |= 1 << 7;
+    protected int encodeHeader(char valueType, boolean isLast) {
+	// uses lower 8 bits for type encoding and the upper bits (> 8) for
+	// flags which are not written to the output stream
+	int header = (byte) valueType;
+	switch (valueType) {
+	case 'd':
+	case 'D':
+	    if (isLast) {
+		// is last value
+		header |= TSBlock.HEADER_LAST_VALUE;
+	    }
+	    break;
+	case 'B':
+	case 'C':
+	case 'F':
+	case 'I':
+	case 'J':
+	case 'S':
+	case 'Z':
+	    break;
+	default:
+	    // encode length
+	    header |= TSBlock.HEADER_VALUE_LENGTH_ENCODED;
+	    break;
 	}
 	return header;
     }
@@ -179,6 +204,7 @@ public class TSBlockBuilder extends BlockBuilder {
 		break;
 	    }
 	} else {
+	    writePrevValue();
 	    writeRaw(key, encodeHeader('N', false), value);
 	}
     }

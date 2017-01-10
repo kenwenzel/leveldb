@@ -24,6 +24,9 @@ import org.iq80.leveldb.table.Block;
 import org.iq80.leveldb.util.Slice;
 
 public class TSBlock extends Block {
+    public static final int HEADER_LAST_VALUE = 1 << 8;
+    public static final int HEADER_VALUE_LENGTH_ENCODED = 1 << 9;
+    
     public TSBlock(Slice block, Comparator<Slice> comparator) {
 	super(block, comparator);
     }
