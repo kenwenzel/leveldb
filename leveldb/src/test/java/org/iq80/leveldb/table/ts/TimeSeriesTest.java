@@ -25,6 +25,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
@@ -106,7 +107,7 @@ public class TimeSeriesTest {
 	Random rnd = new Random(200);
 	long startTime = 1478252048736L;
 
-	int nrOfValues = 5 * 1000 * 1000;
+	int nrOfValues = 1 * 1000 * 1000;
 
 	// holds generated data
 	List<Pair<byte[], byte[]>> recordedEntries = new ArrayList<>();
@@ -159,7 +160,7 @@ public class TimeSeriesTest {
 	}
     }
 
-//    @Test
+    @Test
     public void testTimeSeriesReverse() throws IOException, DBException {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
 		.blockRestartInterval(500);
@@ -215,6 +216,61 @@ public class TimeSeriesTest {
 	db.close();
     }
     
+    @Test
+    public void testRandomTime() throws IOException, DBException {
+	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
+		.blockRestartInterval(500);
+	options.timeSeriesMode(false);
+	options.reverseOrdering(false);
+
+	File path = getTestDirectory("testRandomTime");
+	DB db = factory.open(path, options);
+
+	Random rnd = new Random(200);
+	long startTime = 1478252048736L;
+
+	int nrOfValues = 100 * 1000;
+
+	// holds generated data
+	List<Pair<byte[], byte[]>> recordedEntries = new ArrayList<>();
+
+	int toAdd = 0;
+	Random rnd2 = new Random(200);
+
+	System.out.println("Adding");
+	for (int i = 0; i < nrOfValues; i++) {
+	    if (i % 10000 == 0) {
+		System.out.println("  at: " + i);
+	    }
+
+	    long currentTime = startTime + rnd.nextInt(100000);
+	    int value = rnd.nextInt(1000);
+	    byte[] valueBytes = ByteBuffer.allocate(1 + Integer.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'I')
+		    .putInt(value).array();
+
+	    if (toAdd-- > 0) {
+		// seek always
+		recordedEntries.add(null);
+		recordedEntries.add(new Pair<>(bytes(currentTime), valueBytes));
+	    } else if (rnd2.nextDouble() < 0.01) {
+		toAdd = rnd2.nextInt(30);
+	    }
+
+	    db.put(bytes(currentTime), valueBytes);
+	}
+
+
+	db.close();
+	db = factory.open(path, options);
+
+	System.out.println("Reading random");
+	// reverse the recorded entries since values are stored in reverse order
+//	Collections.reverse(recordedEntries);
+	readElements(recordedEntries, db.iterator());
+
+	db.close();
+    }
+    
     void readElements(List<Pair<byte[], byte[]>> expected, DBIterator it) {
 	System.out.println("Read " + expected.size() + " elements.");
 	boolean seek = true;
@@ -223,6 +279,7 @@ public class TimeSeriesTest {
 		seek = true;
 	    } else {
 		if (seek) {
+		    System.out.println("SEEK " + Arrays.toString(testEntry.key));
 		    it.seek(testEntry.key);
 		    seek = false;
 		}
