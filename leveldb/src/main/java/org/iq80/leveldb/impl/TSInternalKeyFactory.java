@@ -40,7 +40,7 @@ public class TSInternalKeyFactory implements InternalKeyFactory {
     @Override
     public InternalKey createInternalKey(Slice userKey, long sequenceNumber, ValueType valueType) {
 	// TODO find a working way to handle multiple sequence numbers
-	sequenceNumber = 0xFF;
+	sequenceNumber = sequenceNumber == Long.MAX_VALUE ? 0xFF : 0;
 	
 	long nr = getLongBigEndian(userKey, Math.max(userKey.length() - SIZE_OF_LONG, 0));
 	long newSequenceNumber = ((nr << 8) | 0xFF & sequenceNumber) & Long.MAX_VALUE;

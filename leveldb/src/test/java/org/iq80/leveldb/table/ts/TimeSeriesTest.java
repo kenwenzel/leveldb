@@ -123,25 +123,23 @@ public class TimeSeriesTest {
 	    }
 
 	    long currentTime = startTime + i * 100;
-	    // long value = rnd.nextInt();
-	    // byte[] valueBytes = ByteBuffer.allocate(1 +
-	    // Long.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'J')
-	    // .putLong(value).array();
 
-	    double value = Math.sin(i / 1000.0 * Math.PI);
+	    byte[] keyBytes = bytes(currentTime);
+	    double value = rnd.nextGaussian(); // Math.sin(i / 1000.0 *
+					       // Math.PI);
 	    byte[] valueBytes = ByteBuffer.allocate(1 + Double.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'D')
 		    .putDouble(value).array();
 
 	    if (toAdd-- > 0) {
-		recordedEntries.add(new Pair<>(bytes(currentTime), valueBytes));
+		recordedEntries.add(new Pair<>(keyBytes, valueBytes));
 		if (toAdd == 0) {
 		    recordedEntries.add(null);
 		}
 	    } else if (rnd2.nextDouble() < 0.01) {
-		toAdd = Math.abs(rnd2.nextInt(10));
+		toAdd = rnd2.nextInt(10);
 	    }
 
-	    db.put(bytes(currentTime), valueBytes);
+	    db.put(keyBytes, valueBytes);
 	}
 
 	db.close();
@@ -200,7 +198,7 @@ public class TimeSeriesTest {
 		    recordedEntries.add(null);
 		}
 	    } else if (rnd2.nextDouble() < 0.01) {
-		toAdd = Math.abs(rnd2.nextInt(10));
+		toAdd = rnd2.nextInt(10);
 	    }
 
 	    db.put(bytes(currentTime), valueBytes);
@@ -218,9 +216,9 @@ public class TimeSeriesTest {
     }
 
     @Test
-    public void testRandomTime() throws IOException, DBException {
+    public void testRandomTime() throws Exception {
 	Options options = new Options().createIfMissing(true).compressionType(CompressionType.SNAPPY)
-		.blockRestartInterval(5);
+		.blockRestartInterval(500);
 	options.timeSeriesMode(TIME_SERIES_MODE);
 	options.reverseOrdering(true);
 
@@ -230,40 +228,51 @@ public class TimeSeriesTest {
 	Random rnd = new Random(200);
 	long lastTime = 1478252048736L;
 
-	int nrOfValues = 100 * 1000;
-	List<Long> keys = new ArrayList<>();
-	for (int i = 0; i < nrOfValues; i++) {
-	    long currentTime = lastTime + 1000 + Math.abs(rnd.nextInt(10000));
-	    keys.add(currentTime);
+	int nrOfValues = 5 * 1000 * 1000;
+	int nrOfSequentialValues = 100;
+	int nrOfStartPoints = nrOfValues / nrOfSequentialValues;
+	List<Long> timePoints = new ArrayList<>();
+	for (int i = 0; i < nrOfStartPoints; i++) {
+	    long currentTime = lastTime + nrOfSequentialValues + rnd.nextInt(10000);
+	    timePoints.add(currentTime);
 	    lastTime = currentTime;
 	}
 
-	Collections.shuffle(keys, rnd);
+	Collections.shuffle(timePoints, rnd);
 
 	// holds generated data
 	List<Pair<byte[], byte[]>> recordedEntries = new ArrayList<>();
-	// ensure initial seeking
-	recordedEntries.add(null);
 
 	int toAdd = 0;
 
 	System.out.println("Adding random");
-	for (Long key : keys) {
-	    int count = 1 + Math.abs(rnd.nextInt(5));
+	int nr = 0;
+	for (Long timePoint : timePoints) {
 	    boolean added = false;
-	    for (int i = 1; i <= count; i++) {
-		long finalKey = key + i;
-		byte[] keyBytes = bytes(finalKey);
 
-		int value = rnd.nextInt(1000);
+	    byte prefix = (byte) rnd.nextInt(100);
+
+	    for (int i = 0; i < nrOfSequentialValues; i++) {
+		if (nr % 10000 == 0) {
+		    System.out.println("  at: " + nr);
+		}
+
+		long time = timePoint + i;
+
+		ByteBuffer finalKey = ByteBuffer.allocate(1 + Long.BYTES).order(ByteOrder.BIG_ENDIAN);
+		finalKey.put((byte) prefix);
+		finalKey.putLong(1, time);
+		byte[] keyBytes = finalKey.array();
+
+		int value = rnd.nextInt();
 		byte[] valueBytes;
 		if (rnd.nextBoolean()) {
 		    // long value
 		    valueBytes = ByteBuffer.allocate(1 + Long.BYTES).order(ByteOrder.BIG_ENDIAN).put((byte) 'J')
-				.putLong(value).array();
+			    .putLong(value).array();
 		} else {
 		    // some black-box object
-		    valueBytes = new byte[1 + Math.abs(rnd.nextInt(20))];
+		    valueBytes = new byte[8];
 		    rnd.nextBytes(valueBytes);
 		    valueBytes[0] = 'O';
 		}
@@ -276,10 +285,11 @@ public class TimeSeriesTest {
 			recordedEntries.add(null);
 		    }
 		} else if (rnd.nextDouble() < 0.01) {
-		    toAdd = Math.abs(rnd.nextInt(10));
+		    toAdd = rnd.nextInt(10);
 		}
 
 		db.put(keyBytes, valueBytes);
+		nr++;
 	    }
 	    if (added && recordedEntries.get(recordedEntries.size() - 1) != null) {
 		// adding seek marker here works for forward and reverse
@@ -287,7 +297,9 @@ public class TimeSeriesTest {
 		recordedEntries.add(null);
 	    }
 	}
-
+	// wait for compaction
+//	Thread.sleep(10000);
+	
 	db.close();
 	db = factory.open(path, options);
 
@@ -298,6 +310,20 @@ public class TimeSeriesTest {
 	db.close();
     }
 
+    String toString(byte[] key) {
+	StringBuilder sb = new StringBuilder();
+	int prefixLength = key.length - 8;
+	for (int i = 0; i < prefixLength; i++) {
+	    sb.append(key[i]);
+	}
+	if (sb.length() > 0) {
+	    sb.append(" ");
+	}
+	long time = ByteBuffer.wrap(key, prefixLength, 8).order(ByteOrder.BIG_ENDIAN).getLong();
+	sb.append(time);
+	return sb.toString();
+    }
+
     void readElements(List<Pair<byte[], byte[]>> expected, DBIterator it) {
 	System.out.println("Read " + expected.size() + " elements.");
 	boolean seek = true;
@@ -306,13 +332,14 @@ public class TimeSeriesTest {
 		seek = true;
 	    } else {
 		if (seek) {
-//		    System.out.println("seek");
+		    // System.out.println("seek");
 		    it.seek(testEntry.key);
 		    seek = false;
 		}
 
 		Entry<byte[], byte[]> dbEntry = it.next();
-//		System.out.println(toLong(dbEntry.getKey()) + "  <-->  " + toLong(testEntry.key));
+		// System.out.println(toString(dbEntry.getKey()) + " <--> " +
+		// toString(testEntry.key));
 		assertEquals(dbEntry.getKey(), testEntry.key);
 		assertEquals(dbEntry.getValue(), testEntry.value);
 	    }
